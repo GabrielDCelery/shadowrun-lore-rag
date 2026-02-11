@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment
+.env
+
+# Data (stored outside repo on homelab)
+extracted/
+chroma_db/
+*.pdf
+
+# IDE
+.idea/
+.vscode/
+
+shadowrun.tar.gz
