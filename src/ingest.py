@@ -109,13 +109,16 @@ def create_vector_store(chunks):
     print(f"Creating vector store at {CHROMA_PATH}")
     CHROMA_PATH.mkdir(parents=True, exist_ok=True)
 
-    # Delete existing vector store
+    # Clear existing vector store contents (can't delete mount point)
     if (CHROMA_PATH / "chroma.sqlite3").exists():
-        print("Removing existing vector store")
+        print("Clearing existing vector store")
         import shutil
 
-        shutil.rmtree(CHROMA_PATH)
-        CHROMA_PATH.mkdir(parents=True, exist_ok=True)
+        for item in CHROMA_PATH.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
 
     print("Generating embeddings and storing in ChromaDB...")
     vector_store = Chroma.from_documents(
