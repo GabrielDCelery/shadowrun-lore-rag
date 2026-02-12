@@ -17,6 +17,13 @@ services:
     # Override command to keep running for manual exec
     command: tail -f /dev/null
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 networks:
   ollama_net:
