@@ -1,7 +1,6 @@
 """Ingest PDFs into the RAG system."""
 
 import sys
-from pathlib import Path
 
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
@@ -10,32 +9,24 @@ from langchain_text_splitters import MarkdownTextSplitter
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 
-from config import (
-    CHROMA_PATH,
-    CHUNK_OVERLAP,
-    CHUNK_SIZE,
-    EMBEDDING_MODEL,
-    EXTRACTED_PATH,
-    OLLAMA_HOST,
-    PDF_PATH,
-)
+from config import settings
 
 
 def convert_pdfs_to_markdown():
     """Convert PDFs to markdown using marker-pdf."""
-    print(f"Looking for PDFs in {PDF_PATH}")
+    print(f"Looking for PDFs in {settings.pdf_path}")
 
-    if not PDF_PATH.exists():
-        print(f"Error: PDF path {PDF_PATH} does not exist")
+    if not settings.pdf_path.exists():
+        print(f"Error: PDF path {settings.pdf_path} does not exist")
         sys.exit(1)
 
-    pdf_files = list(PDF_PATH.glob("*.pdf"))
+    pdf_files = list(settings.pdf_path.glob("*.pdf"))
     if not pdf_files:
-        print(f"No PDF files found in {PDF_PATH}")
+        print(f"No PDF files found in {settings.pdf_path}")
         return
 
     print(f"Found {len(pdf_files)} PDF files")
-    EXTRACTED_PATH.mkdir(parents=True, exist_ok=True)
+    settings.extracted_path.mkdir(parents=True, exist_ok=True)
 
     # Initialize marker-pdf models
     print("Loading marker-pdf models...")
@@ -43,7 +34,7 @@ def convert_pdfs_to_markdown():
     converter = PdfConverter(artifact_dict=model_dict)
 
     for pdf_file in pdf_files:
-        output_file = EXTRACTED_PATH / f"{pdf_file.stem}.md"
+        output_file = settings.extracted_path / f"{pdf_file.stem}.md"
 
         if output_file.exists():
             print(f"Skipping {pdf_file.name} (already extracted)")
@@ -63,15 +54,17 @@ def convert_pdfs_to_markdown():
 
 def load_and_chunk_documents():
     """Load markdown files and chunk them."""
-    print(f"\nLoading documents from {EXTRACTED_PATH}")
+    print(f"\nLoading documents from {settings.extracted_path}")
 
-    if not EXTRACTED_PATH.exists() or not list(EXTRACTED_PATH.glob("*.md")):
-        print(f"No markdown files found in {EXTRACTED_PATH}")
+    if not settings.extracted_path.exists() or not list(
+        settings.extracted_path.glob("*.md")
+    ):
+        print(f"No markdown files found in {settings.extracted_path}")
         print("Run PDF conversion first")
         return []
 
     loader = DirectoryLoader(
-        str(EXTRACTED_PATH),
+        str(settings.extracted_path),
         glob="*.md",
         loader_cls=TextLoader,
         loader_kwargs={"encoding": "utf-8"},
@@ -80,10 +73,10 @@ def load_and_chunk_documents():
     documents = loader.load()
     print(f"Loaded {len(documents)} documents")
 
-    print(f"Chunking with size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP}")
+    print(f"Chunking with size={settings.chunk_size}, overlap={settings.chunk_overlap}")
     text_splitter = MarkdownTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
     )
 
     chunks = text_splitter.split_documents(documents)
@@ -98,23 +91,23 @@ def create_vector_store(chunks):
         print("No chunks to process")
         return
 
-    print(f"\nConnecting to Ollama at {OLLAMA_HOST}")
-    print(f"Using embedding model: {EMBEDDING_MODEL}")
+    print(f"\nConnecting to Ollama at {settings.ollama_host}")
+    print(f"Using embedding model: {settings.embedding_model}")
 
     embeddings = OllamaEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=OLLAMA_HOST,
+        model=settings.embedding_model,
+        base_url=settings.ollama_host,
     )
 
-    print(f"Creating vector store at {CHROMA_PATH}")
-    CHROMA_PATH.mkdir(parents=True, exist_ok=True)
+    print(f"Creating vector store at {settings.chroma_path}")
+    settings.chroma_path.mkdir(parents=True, exist_ok=True)
 
     # Clear existing vector store contents (can't delete mount point)
-    if (CHROMA_PATH / "chroma.sqlite3").exists():
+    if (settings.chroma_path / "chroma.sqlite3").exists():
         print("Clearing existing vector store")
         import shutil
 
-        for item in CHROMA_PATH.iterdir():
+        for item in settings.chroma_path.iterdir():
             if item.is_dir():
                 shutil.rmtree(item)
             else:
@@ -124,7 +117,7 @@ def create_vector_store(chunks):
     vector_store = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
-        persist_directory=str(CHROMA_PATH),
+        persist_directory=str(settings.chroma_path),
     )
 
     print(f"Successfully created vector store with {len(chunks)} chunks")

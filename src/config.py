@@ -1,24 +1,45 @@
 """Configuration for Shadowrun Lore RAG system."""
 
-import os
 from pathlib import Path
 
-# Ollama connection
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://host.docker.internal:11434")
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Ollama models
-EMBEDDING_MODEL = "nomic-embed-text"
-LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2")
 
-# Data paths
-DATA_PATH = Path(os.getenv("DATA_PATH", "/srv/shadowrun-rag"))
-PDF_PATH = DATA_PATH / "pdfs"
-EXTRACTED_PATH = DATA_PATH / "extracted"
-CHROMA_PATH = DATA_PATH / "chroma_db"
+class Settings(BaseSettings):
+    # Ollama connection
+    ollama_host: str = "http://host.docker.internal:11434"
 
-# Chunking settings
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 200
+    # Ollama models
+    embedding_model: str = "nomic-embed-text"
+    llm_model: str = "llama3.2"
 
-# Retrieval settings
-TOP_K = 5
+    # Data paths
+    data_path: Path = Path("/srv/shadowrun-rag")
+
+    # Chunking settings
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+
+    # Retrieval settings
+    top_k: int = 5
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
+    @property
+    def pdf_path(self) -> Path:
+        return self.data_path / "pdfs"
+
+    @property
+    def extracted_path(self) -> Path:
+        return self.data_path / "extracted"
+
+    @property
+    def chroma_path(self) -> Path:
+        return self.data_path / "chroma_db"
+
+
+settings = Settings()
