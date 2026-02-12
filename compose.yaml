@@ -3,15 +3,15 @@ services:
     build: .
     container_name: shadowrun-rag
     environment:
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://ollama:11434
       - DATA_PATH=/data
-      - LLM_MODEL=llama3.2
+      - LLM_MODEL=llama3.1:8b
     volumes:
       - /srv/shadowrun-rag/pdfs:/data/pdfs:ro
       - /srv/shadowrun-rag/extracted:/data/extracted
       - /srv/shadowrun-rag/chroma_db:/data/chroma_db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - ollama_net
     # No ports needed - CLI only
     # Override command to keep running for manual exec
     command: tail -f /dev/null
