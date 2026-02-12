@@ -85,6 +85,32 @@ ssh $HOMELAB_HOST docker exec shadowrun-rag uv run python src/ingest.py
 # - Chunk the markdown into ~1000 char pieces
 # - Generate embeddings and store in ChromaDB
 
+# Also while it is running worth verifying if the GPU is being used
+ssh $HOMELAB_HOST nvidia-smi
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 3060        Off |   00000000:01:00.0 Off |                  N/A |
+|  0%   40C    P2             36W /  170W |    3453MiB /  12288MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A           17892      C   /app/.venv/bin/python3                 3444MiB |
++-----------------------------------------------------------------------------------------+
+```
+
+6. Once the PDFs have been analyzed have fun
+
+```sh
 docker exec -it shadowrun-rag uv run python src/query.py "What is essence in Shadowrun?"
 docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```
