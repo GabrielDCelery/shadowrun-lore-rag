@@ -64,27 +64,27 @@ uv run python src/query.py "What is essence?"
 
 ## Deployment
 
-- **Provisioning**: None
-- **Infrastructure**: Homelab (Docker)
-- **CI/CD**: Manual (`./deploy.sh`)
-- **Environments**: prod only
-
-### Deploy to Homelab
+1. Make sure ollama is deployed via the homelab repo `https://github.com/GabrielDCelery/personal-homelab`
+2. Set up necessary dir structure on the homelab
 
 ```sh
-git push
-./deploy.sh
+# On the remote machine
+sudo mkdir -p /srv/shadowrun-rag/{pdfs,extracted,chroma_db,model_cache}
+sudo chown -R $USER:$USER /srv/shadowrun-rag
+# place the pdfs into /srv/shadowrun-rag/pdfs
 ```
 
-### Run Commands on Homelab
+3. Set up `.env` file on the development machine
+4. Run from the development machine (`./deploy.sh`)
+5. Run the fillowing scripts from the development machine
 
 ```sh
-# Ingest PDFs
-ssh homelab docker exec -it shadowrun-rag uv run python src/ingest.py
+ssh $HOMELAB_HOST docker exec shadowrun-rag uv run python src/ingest.py
+# This will:
+# - Convert PDFs to markdown using marker-pdf
+# - Chunk the markdown into ~1000 char pieces
+# - Generate embeddings and store in ChromaDB
 
-# Query
-ssh homelab docker exec -it shadowrun-rag uv run python src/query.py "your question"
-
-# Query with sources
-ssh homelab docker exec -it shadowrun-rag uv run python src/query.py "your question" --sources
+docker exec -it shadowrun-rag uv run python src/query.py "What is essence in Shadowrun?"
+docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```
