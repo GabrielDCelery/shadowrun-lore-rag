@@ -22,7 +22,7 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 ## Infrastructure
 
 - **This repo:** Application code only
-- **Homelab repo:** `~/projects/github-GabrielDCelery/personal-homelab` manages Ollama and other services
+- **Homelab repo:** `https://github.com/GabrielDCelery/personal-homelab` manages Ollama and other services
 - **Ollama:** Runs separately in Docker on homelab (GPU-enabled), exposed on port 11434
 - **Data path:** `/srv/shadowrun-rag/` on homelab (not in repo)
   - `pdfs/` - source PDFs (read-only)
