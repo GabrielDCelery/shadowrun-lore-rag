@@ -10,6 +10,7 @@ services:
       - /srv/shadowrun-rag/pdfs:/data/pdfs:ro
       - /srv/shadowrun-rag/extracted:/data/extracted
       - /srv/shadowrun-rag/chroma_db:/data/chroma_db
+      - /srv/shadowrun-rag/model_cache:/root/.cache
     networks:
       - ollama_net
     # No ports needed - CLI only
