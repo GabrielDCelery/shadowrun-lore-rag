@@ -16,3 +16,7 @@ services:
     # Override command to keep running for manual exec
     command: tail -f /dev/null
     restart: unless-stopped
+
+networks:
+  ollama_net:
+    external: true
