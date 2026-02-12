@@ -1,3 +1,6 @@
 [tools]
 python = "3.12"
 uv = "0.9.26"
+
+[env]
+_.file = { path = '.env' }
