@@ -1,4 +1,5 @@
 #!/bin/bash
+# This is a deploy script that has to be ran from the development machine, will connect to my homelab to build the docker container there
 set -e
 
 HOMELAB_HOST="${HOMELAB_HOST:-homelab}"
