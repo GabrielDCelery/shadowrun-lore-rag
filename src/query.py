@@ -2,9 +2,10 @@
 
 import sys
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
 from langchain_chroma import Chroma
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from config import CHROMA_PATH, EMBEDDING_MODEL, LLM_MODEL, OLLAMA_HOST, TOP_K
@@ -31,15 +32,23 @@ def load_vector_store():
     return vector_store
 
 
-def create_qa_chain(vector_store):
-    """Create a QA chain with the vector store."""
+def format_docs(docs):
+    """Format retrieved documents into a single string."""
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
+def create_rag_chain(vector_store):
+    """Create a RAG chain with the vector store using LCEL."""
     llm = ChatOllama(
         model=LLM_MODEL,
         base_url=OLLAMA_HOST,
         temperature=0,
     )
 
-    prompt_template = """You are an expert on the Shadowrun RPG system. Use the following pieces of context from the Shadowrun rulebooks to answer the question. If you don't know the answer based on the context, say so - don't make up information.
+    retriever = vector_store.as_retriever(search_kwargs={"k": TOP_K})
+
+    prompt = ChatPromptTemplate.from_template(
+        """You are an expert on the Shadowrun RPG system. Use the following pieces of context from the Shadowrun rulebooks to answer the question. If you don't know the answer based on the context, say so - don't make up information.
 
 Context:
 {context}
@@ -47,21 +56,16 @@ Context:
 Question: {question}
 
 Answer:"""
-
-    prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "question"],
     )
 
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vector_store.as_retriever(search_kwargs={"k": TOP_K}),
-        chain_type_kwargs={"prompt": prompt},
-        return_source_documents=True,
+    rag_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
     )
 
-    return qa_chain
+    return rag_chain, retriever
 
 
 def query(question: str, show_sources: bool = False):
@@ -70,20 +74,21 @@ def query(question: str, show_sources: bool = False):
     print(f"Retrieving top {TOP_K} relevant chunks\n")
 
     vector_store = load_vector_store()
-    qa_chain = create_qa_chain(vector_store)
+    rag_chain, retriever = create_rag_chain(vector_store)
 
     print(f"Question: {question}\n")
     print("Generating answer...\n")
 
-    result = qa_chain.invoke({"query": question})
+    answer = rag_chain.invoke(question)
 
     print("Answer:")
-    print(result["result"])
+    print(answer)
 
     if show_sources:
+        docs = retriever.invoke(question)
         print("\n" + "=" * 80)
         print("Sources:")
-        for i, doc in enumerate(result["source_documents"], 1):
+        for i, doc in enumerate(docs, 1):
             source = doc.metadata.get("source", "Unknown")
             print(f"\n[{i}] {source}")
             print(doc.page_content[:200] + "...")
