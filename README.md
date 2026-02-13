@@ -44,7 +44,8 @@ Secrets are stored in: None
 
 ## Deployment
 
-1. Set up necessary dir structure on the machine you want to run the containers on
+1. Set up `.env` file on the `development machine`
+2. Set up necessary dir structure on the `remote machine` you want to run the containers on
 
 ```sh
 /srv/ollama/        # mount point for ollama
@@ -57,25 +58,38 @@ Secrets are stored in: None
 ```sh
 # On the remote machine
 sudo mkdir -p /srv/ollama
-sudo chown -R $USER:$USER /srv/ollama
 sudo mkdir -p /srv/shadowrun-rag/{pdfs,extracted,chroma_db,model_cache}
-sudo chown -R $USER:$USER /srv/shadowrun-rag
+sudo chown -R $SHDWRN_REMOTE_USER :$SHDWRN_REMOTE_USER /srv/shadowrun-rag
 # place the pdfs into /srv/shadowrun-rag/pdfs
 ```
 
-3. Set up `.env` file on the development machine
-4. Run from the development machine (`./deploy.sh`)
-5. Run the following scripts from the development machine
+3. Create a docker context for the `remote machine` where the containers will be running (or skip this step if you are runnig the containers)
 
 ```sh
-ssh $HOMELAB_HOST docker exec shadowrun-rag uv run python src/ingest.py
+docker context create shadowrun-rag --docker "host=ssh://$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST"
+docker contest use shadowrun-rag
+```
+
+4. Build and deploy the compose file from the `deployment machine`
+
+```sh
+docker compose build
+docker compose down && docker compose up -d
+```
+
+5. Run the following scripts from the `development machine`
+
+```sh
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/ingest.py
+# Or run this if you are running the containers locally
+# docker exec shadowrun-rag uv run python src/ingest.py
 # This will:
 # - Convert PDFs to markdown using marker-pdf
 # - Chunk the markdown into ~1000 char pieces
 # - Generate embeddings and store in ChromaDB
 
 # Also while it is running worth verifying if the GPU is being used
-ssh $HOMELAB_HOST nvidia-smi
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST nvidia-smi
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
 +-----------------------------------------+------------------------+----------------------+
@@ -100,6 +114,6 @@ ssh $HOMELAB_HOST nvidia-smi
 6. Once the PDFs have been analyzed have fun
 
 ```sh
-docker exec -it shadowrun-rag uv run python src/query.py "What is Tír Tairngire"
+docker exec -it shadowrun-rag uv run python src/query.py "What is Tir Tairngire"
 docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```
