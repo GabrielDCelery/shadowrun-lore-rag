@@ -32,17 +32,7 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 | Vector store   | ChromaDB                                    |
 | LLM            | Ollama (configurable: llama3.1:8b, mistral) |
 
-## Configuration
-
-| Variable      | Description              | Required | Default                             |
-| ------------- | ------------------------ | -------- | ----------------------------------- |
-| `OLLAMA_HOST` | Ollama API URL           | No       | `http://host.docker.internal:11434` |
-| `DATA_PATH`   | Base path for data files | No       | `/srv/shadowrun-rag`                |
-| `LLM_MODEL`   | Ollama model for answers | No       | `llama3.2`                          |
-
-Secrets are stored in: None
-
-## Deployment
+## Development / Deployment
 
 1. Set up `.env` file on the `development machine`
 2. Set up necessary dir structure on the `remote machine` you want to run the containers on
@@ -67,7 +57,7 @@ sudo chown -R $SHDWRN_REMOTE_USER :$SHDWRN_REMOTE_USER /srv/shadowrun-rag
 
 ```sh
 docker context create shadowrun-rag --docker "host=ssh://$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST"
-docker contest use shadowrun-rag
+docker context use shadowrun-rag
 ```
 
 4. Build and deploy the compose file from the `deployment machine`
@@ -117,3 +107,18 @@ ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST nvidia-smi
 docker exec -it shadowrun-rag uv run python src/query.py "What is Tir Tairngire"
 docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```
+
+## Container Configuration
+
+| Variable          | Description                  | Required | Default                   |
+| ----------------- | ---------------------------- | -------- | ------------------------- |
+| `OLLAMA_HOST`     | Ollama API URL               | No       | `http://ollama-rag:11434` |
+| `EMBEDDING_MODEL` | Ollama model for embeddings  | No       | `mxbai-embed-large`       |
+| `LLM_MODEL`       | Ollama model for answers     | No       | `llama3.1:8b`             |
+| `DATA_PATH`       | Base path for data files     | No       | `/srv/shadowrun-rag`      |
+| `CHUNK_SIZE`      | Text chunk size (characters) | No       | `1000`                    |
+| `CHUNK_OVERLAP`   | Overlap between chunks       | No       | `200`                     |
+| `TOP_K`           | Number of chunks to retrieve | No       | `5`                       |
+| `LOG_LEVEL`       | Logging level                | No       | `INFO`                    |
+
+Secrets are stored in: None

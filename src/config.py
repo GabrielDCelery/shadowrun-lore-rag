@@ -7,11 +7,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Ollama connection
-    ollama_host: str = "http://host.docker.internal:11434"
+    ollama_host: str = "http://ollama-rag:11434"
 
     # Ollama models
-    embedding_model: str = "nomic-embed-text"
-    llm_model: str = "llama3.2"
+    embedding_model: str = "mxbai-embed-large"
+    llm_model: str = "llama3.1:8b"
 
     # Data paths
     data_path: Path = Path("/srv/shadowrun-rag")
