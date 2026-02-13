@@ -82,6 +82,7 @@ def query(question: str, show_sources: bool = False):
     answer = rag_chain.invoke(question)
 
     print("Answer:")
+    print("")
     print(answer)
 
     if show_sources:
@@ -109,7 +110,6 @@ def main():
 
     question = " ".join(sys.argv[1:])
 
-    print("=== Shadowrun Lore RAG Query ===\n")
     query(question, show_sources=show_sources)
 
 
