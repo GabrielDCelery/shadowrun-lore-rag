@@ -10,59 +10,58 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
                            query → retrieve → Ollama LLM → answer
 ```
 
-| Component      | Choice                                          |
-| -------------- | ----------------------------------------------- |
-| PDF extraction | marker-pdf                                      |
-| Chunking       | langchain text splitters (markdown-aware)       |
-| Embeddings     | Ollama `nomic-embed-text`                       |
-| Vector store   | ChromaDB (file-based)                           |
-| LLM            | Ollama (user's choice: llama3.2, mistral, etc.) |
-| Orchestration  | langchain + langchain-ollama                    |
+| Component      | Choice                                    |
+| -------------- | ----------------------------------------- |
+| PDF extraction | marker-pdf                                |
+| Chunking       | langchain text splitters (markdown-aware) |
+| Embeddings     | Ollama `mxbai-embed-large`                |
+| Vector store   | ChromaDB (file-based)                     |
+| LLM            | Ollama `llama3.1:8b` (configurable)       |
+| Orchestration  | langchain + langchain-ollama              |
 
 ## Infrastructure
 
-- **This repo:** Application code only
-- **Homelab repo:** `https://github.com/GabrielDCelery/personal-homelab` manages Ollama and other services
-- **Ollama:** Runs separately in Docker on homelab (GPU-enabled), exposed on port 11434
-- **Data path:** `/srv/shadowrun-rag/` on homelab (not in repo)
+- **This repo:** Application code + compose.yaml (runs both RAG app and Ollama)
+- **Ollama:** Runs in Docker container (`ollama-rag`) with GPU access
+- **Data path:** `/srv/shadowrun-rag/` on homelab (mounted into container as `/data`)
   - `pdfs/` - source PDFs (read-only)
   - `extracted/` - markdown output from marker-pdf
   - `chroma_db/` - vector database
+  - `model_cache/` - marker-pdf model cache
 
 ## Development Workflow
 
 1. Edit code locally on laptop
-2. `git push`
-3. `./deploy.sh` - SSHs to homelab, pulls, builds, restarts container
-4. Query via: `ssh homelab docker exec -it shadowrun-rag python src/query.py "your question"`
+2. Create docker context for remote: `docker context create shadowrun-rag --docker "host=ssh://user@host"`
+3. `docker context use shadowrun-rag`
+4. `docker compose build && docker compose up -d`
+5. Ingest: `docker exec shadowrun-rag uv run python src/ingest.py`
+6. Query: `docker exec -it shadowrun-rag uv run python src/query.py "your question"`
 
 ## Key Files
 
-| File            | Purpose                                           |
-| --------------- | ------------------------------------------------- |
-| `src/ingest.py` | Process PDFs, chunk, embed, store in ChromaDB     |
-| `src/query.py`  | CLI interface to ask questions                    |
-| `src/config.py` | Settings (paths, Ollama host)                     |
-| `compose.yaml`  | Container config, mounts data, connects to Ollama |
-| `deploy.sh`     | One-command deployment to homelab                 |
+| File            | Purpose                                       |
+| --------------- | --------------------------------------------- |
+| `src/ingest.py` | Convert PDFs, chunk, embed, store in ChromaDB |
+| `src/query.py`  | CLI interface to ask questions                |
+| `src/config.py` | Pydantic settings (paths, models, tuning)     |
+| `src/logs.py`   | Logging configuration                         |
+| `compose.yaml`  | Container config for RAG app + Ollama         |
+| `Dockerfile`    | Python 3.12 + uv + marker-pdf dependencies    |
 
 ## Environment Variables
 
-| Variable      | Description        | Default                             |
-| ------------- | ------------------ | ----------------------------------- |
-| `OLLAMA_HOST` | Ollama API URL     | `http://host.docker.internal:11434` |
-| `DATA_PATH`   | Base path for data | `/srv/shadowrun-rag`                |
+| Variable          | Description                  | Default                   |
+| ----------------- | ---------------------------- | ------------------------- |
+| `OLLAMA_HOST`     | Ollama API URL               | `http://ollama-rag:11434` |
+| `EMBEDDING_MODEL` | Ollama model for embeddings  | `mxbai-embed-large`       |
+| `LLM_MODEL`       | Ollama model for answers     | `llama3.1:8b`             |
+| `DATA_PATH`       | Base path for data files     | `/srv/shadowrun-rag`      |
+| `CHUNK_SIZE`      | Text chunk size (characters) | `1000`                    |
+| `CHUNK_OVERLAP`   | Overlap between chunks       | `200`                     |
+| `TOP_K`           | Number of chunks to retrieve | `5`                       |
+| `LOG_LEVEL`       | Logging level                | `INFO`                    |
 
 ## Decisions
 
 See `.claude/docs/decisions.md` for architecture decisions and rationale.
-
-## Status
-
-- [x] Architecture decisions made
-- [x] AI context files created
-- [ ] Ingest pipeline (`src/ingest.py`)
-- [ ] Query CLI (`src/query.py`)
-- [ ] Dockerfile and compose.yaml
-- [ ] deploy.sh script
-- [ ] Test with actual PDFs
