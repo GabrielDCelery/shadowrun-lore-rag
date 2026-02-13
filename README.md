@@ -1,15 +1,12 @@
-# Shadowrun Lore RAG
+# What is this project?
 
-A RAG system for querying Shadowrun RPG rulebooks using natural language. Runs on a homelab with Ollama.
+Shadowrun is a Role-playing game from the 90s that I grew up with and got very fond memories of. This is a project idea that I have been toying with for a while but when I saw this article [Guide to RAG embeddings](https://medium.com/@sharanharsoor/the-complete-guide-to-embeddings-and-rag-from-theory-to-production-758a16d747ac) I decided to put things into action.
 
-## Quick Start
+Here we are, a RAG system for querying Shadowrun RPG rulebooks using natural language. Runs on a homelab with Ollama.
 
-```sh
-git clone <repo>
-cd shadowrun-lore-rag
-uv sync
-./deploy.sh
-```
+![Screenshot Shadowrun 03](./assets/screenshot-shadowrun-03.jpg)
+![Screenshot Shadowrun 01](./assets/screenshot-shadowrun-01.jpg)
+![Screenshot Shadowrun 02](./assets/screenshot-shadowrun-02.jpg)
 
 ## Architecture
 
@@ -27,13 +24,13 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
                            query → retrieve → Ollama LLM → answer
 ```
 
-| Component      | Choice                                    |
-| -------------- | ----------------------------------------- |
-| PDF extraction | marker-pdf                                |
-| Chunking       | langchain text splitters (markdown-aware) |
-| Embeddings     | Ollama `nomic-embed-text`                 |
-| Vector store   | ChromaDB                                  |
-| LLM            | Ollama (configurable: llama3.2, mistral)  |
+| Component      | Choice                                      |
+| -------------- | ------------------------------------------- |
+| PDF extraction | marker-pdf                                  |
+| Chunking       | langchain text splitters (markdown-aware)   |
+| Embeddings     | Ollama `mxbai-embed-large`                  |
+| Vector store   | ChromaDB                                    |
+| LLM            | Ollama (configurable: llama3.1:8b, mistral) |
 
 ## Configuration
 
@@ -45,27 +42,17 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 
 Secrets are stored in: None
 
-### Data Directory Structure
+## Deployment
 
-```
+1. Make sure ollama is deployed via the homelab repo `https://github.com/GabrielDCelery/personal-homelab`
+2. Set up necessary dir structure on the homelab
+
+```sh
 /srv/shadowrun-rag/
 ├── pdfs/        # Source PDFs (read-only)
 ├── extracted/   # Markdown output from marker-pdf
 └── chroma_db/   # Vector database
 ```
-
-## Development
-
-```sh
-uv sync
-uv run python src/ingest.py
-uv run python src/query.py "What is essence?"
-```
-
-## Deployment
-
-1. Make sure ollama is deployed via the homelab repo `https://github.com/GabrielDCelery/personal-homelab`
-2. Set up necessary dir structure on the homelab
 
 ```sh
 # On the remote machine
@@ -111,7 +98,6 @@ ssh $HOMELAB_HOST nvidia-smi
 6. Once the PDFs have been analyzed have fun
 
 ```sh
-docker exec -it shadowrun-rag uv run python src/query.py "What is essence in Shadowrun?"
 docker exec -it shadowrun-rag uv run python src/query.py "What is Tír Tairngire"
 docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```
