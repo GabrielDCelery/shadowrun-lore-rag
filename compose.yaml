@@ -5,6 +5,7 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - DATA_PATH=/data
+      - EMBEDDING_MODEL=mxbai-embed-large
       - LLM_MODEL=llama3.1:8b
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - TOP_K=12
