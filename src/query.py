@@ -8,24 +8,24 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-from config import CHROMA_PATH, EMBEDDING_MODEL, LLM_MODEL, OLLAMA_HOST, TOP_K
+from config import settings
 
 
 def load_vector_store():
     """Load the existing ChromaDB vector store."""
-    if not CHROMA_PATH.exists():
-        print(f"Error: Vector store not found at {CHROMA_PATH}")
+    if not settings.chroma_path.exists():
+        print(f"Error: Vector store not found at {settings.chroma_path}")
         print("Run ingest.py first to create the vector store")
         sys.exit(1)
 
-    print(f"Loading vector store from {CHROMA_PATH}")
+    print(f"Loading vector store from {settings.chroma_path}")
     embeddings = OllamaEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=OLLAMA_HOST,
+        model=settings.embedding_model,
+        base_url=settings.ollama_host,
     )
 
     vector_store = Chroma(
-        persist_directory=str(CHROMA_PATH),
+        persist_directory=str(settings.chroma_path),
         embedding_function=embeddings,
     )
 
@@ -40,12 +40,12 @@ def format_docs(docs):
 def create_rag_chain(vector_store):
     """Create a RAG chain with the vector store using LCEL."""
     llm = ChatOllama(
-        model=LLM_MODEL,
-        base_url=OLLAMA_HOST,
+        model=settings.llm_model,
+        base_url=settings.ollama_host,
         temperature=0,
     )
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": TOP_K})
+    retriever = vector_store.as_retriever(search_kwargs={"k": settings.top_k})
 
     prompt = ChatPromptTemplate.from_template(
         """You are an expert on the Shadowrun RPG system. Use the following pieces of context from the Shadowrun rulebooks to answer the question. If you don't know the answer based on the context, say so - don't make up information.
@@ -70,8 +70,8 @@ Answer:"""
 
 def query(question: str, show_sources: bool = False):
     """Query the RAG system."""
-    print(f"Using model: {LLM_MODEL}")
-    print(f"Retrieving top {TOP_K} relevant chunks\n")
+    print(f"Using model: {settings.llm_model}")
+    print(f"Retrieving top {settings.top_k} relevant chunks\n")
 
     vector_store = load_vector_store()
     rag_chain, retriever = create_rag_chain(vector_store)
