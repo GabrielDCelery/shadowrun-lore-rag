@@ -44,18 +44,20 @@ Secrets are stored in: None
 
 ## Deployment
 
-1. Make sure ollama is deployed via the homelab repo `https://github.com/GabrielDCelery/personal-homelab`
-2. Set up necessary dir structure on the homelab
+1. Set up necessary dir structure on the machine you want to run the containers on
 
 ```sh
-/srv/shadowrun-rag/
-├── pdfs/        # Source PDFs (read-only)
-├── extracted/   # Markdown output from marker-pdf
-└── chroma_db/   # Vector database
+/srv/ollama/        # mount point for ollama
+/srv/shadowrun-rag/ # mount point for shadowrun-rag
+├── pdfs/           # Source PDFs (read-only)
+├── extracted/      # Markdown output from marker-pdf
+└── chroma_db/      # Vector database
 ```
 
 ```sh
 # On the remote machine
+sudo mkdir -p /srv/ollama
+sudo chown -R $USER:$USER /srv/ollama
 sudo mkdir -p /srv/shadowrun-rag/{pdfs,extracted,chroma_db,model_cache}
 sudo chown -R $USER:$USER /srv/shadowrun-rag
 # place the pdfs into /srv/shadowrun-rag/pdfs
@@ -63,7 +65,7 @@ sudo chown -R $USER:$USER /srv/shadowrun-rag
 
 3. Set up `.env` file on the development machine
 4. Run from the development machine (`./deploy.sh`)
-5. Run the fillowing scripts from the development machine
+5. Run the following scripts from the development machine
 
 ```sh
 ssh $HOMELAB_HOST docker exec shadowrun-rag uv run python src/ingest.py

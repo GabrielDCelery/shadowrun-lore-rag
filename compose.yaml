@@ -1,9 +1,26 @@
 services:
+  ollama-rag:
+    image: ollama/ollama:0.15.1
+    container_name: ollama-rag
+    volumes:
+      - /srv/ollama:/root/.ollama
+    # https://docs.docker.com/compose/how-tos/gpu-support
+    networks:
+      - shadowrun_rag
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
   shadowrun-rag:
     build: .
     container_name: shadowrun-rag
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://ollama-rag:11434
       - DATA_PATH=/data
       - EMBEDDING_MODEL=mxbai-embed-large
       - LLM_MODEL=llama3.1:8b
@@ -16,11 +33,9 @@ services:
       - /srv/shadowrun-rag/chroma_db:/data/chroma_db
       - /srv/shadowrun-rag/model_cache:/root/.cache
     networks:
-      - ollama_net
-    # No ports needed - CLI only
+      - shadowrun_rag
     # Override command to keep running for manual exec
     command: tail -f /dev/null
-    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -28,7 +43,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    restart: unless-stopped
 
 networks:
-  ollama_net:
-    external: true
+  shadowrun_rag:
+    external: false
