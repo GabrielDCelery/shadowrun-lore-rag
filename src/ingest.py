@@ -10,26 +10,28 @@ from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 
 from config import settings
+from logs import logger, setup_logging
 
 
 def convert_pdfs_to_markdown():
     """Convert PDFs to markdown using marker-pdf."""
-    print(f"Looking for PDFs in {settings.pdf_path}")
+    logger.info(f"looking for PDFs in {settings.pdf_path}")
 
     if not settings.pdf_path.exists():
-        print(f"Error: PDF path {settings.pdf_path} does not exist")
+        logger.error(f"pdf path {settings.pdf_path} does not exist")
         sys.exit(1)
 
     pdf_files = list(settings.pdf_path.glob("*.pdf"))
     if not pdf_files:
-        print(f"No PDF files found in {settings.pdf_path}")
+        logger.info(f"no PDF files found in {settings.pdf_path}")
         return
 
-    print(f"Found {len(pdf_files)} PDF files")
+    logger.info(f"found {len(pdf_files)} PDF files for extraction")
+
     settings.extracted_path.mkdir(parents=True, exist_ok=True)
 
     # Initialize marker-pdf models
-    print("Loading marker-pdf models...")
+    logger.info(f"loading marker-pdf models...")
     model_dict = create_model_dict()
     converter = PdfConverter(artifact_dict=model_dict)
 
@@ -37,30 +39,29 @@ def convert_pdfs_to_markdown():
         output_file = settings.extracted_path / f"{pdf_file.stem}.md"
 
         if output_file.exists():
-            print(f"Skipping {pdf_file.name} (already extracted)")
+            logger.info(f"skipping {pdf_file.name} (already extracted)")
             continue
 
-        print(f"Converting {pdf_file.name}...")
+        logger.info(f"converting {pdf_file.name}")
         try:
             rendered = converter(str(pdf_file))
 
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write(rendered.markdown)
 
-            print(f"  Saved to {output_file.name}")
+            logger.info(f"saved to {output_file.name}")
         except Exception as e:
-            print(f"  Error converting {pdf_file.name}: {e}")
+            logger.error(f"error converting {pdf_file.name}: {e}")
 
 
 def load_and_chunk_documents():
     """Load markdown files and chunk them."""
-    print(f"\nLoading documents from {settings.extracted_path}")
+    logger.info(f"loading documents from {settings.extracted_path}")
 
     if not settings.extracted_path.exists() or not list(
         settings.extracted_path.glob("*.md")
     ):
-        print(f"No markdown files found in {settings.extracted_path}")
-        print("Run PDF conversion first")
+        logger.info(f"no markdown files found in {settings.extracted_path}")
         return []
 
     loader = DirectoryLoader(
@@ -71,16 +72,18 @@ def load_and_chunk_documents():
     )
 
     documents = loader.load()
-    print(f"Loaded {len(documents)} documents")
+    logger.info(f"loaded {len(documents)} documents")
 
-    print(f"Chunking with size={settings.chunk_size}, overlap={settings.chunk_overlap}")
+    logger.info(
+        f"chunking with size={settings.chunk_size}, overlap={settings.chunk_overlap}"
+    )
     text_splitter = MarkdownTextSplitter(
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
     )
 
     chunks = text_splitter.split_documents(documents)
-    print(f"Created {len(chunks)} chunks")
+    logger.info(f"created {len(chunks)} chunks")
 
     return chunks
 
@@ -88,23 +91,23 @@ def load_and_chunk_documents():
 def create_vector_store(chunks):
     """Create embeddings and store in ChromaDB."""
     if not chunks:
-        print("No chunks to process")
+        logger.info("no chunks to process")
         return
 
-    print(f"\nConnecting to Ollama at {settings.ollama_host}")
-    print(f"Using embedding model: {settings.embedding_model}")
+    logger.info(f"connecting to Ollama at {settings.ollama_host}")
+    logger.info(f"using embedding model: {settings.embedding_model}")
 
     embeddings = OllamaEmbeddings(
         model=settings.embedding_model,
         base_url=settings.ollama_host,
     )
 
-    print(f"Creating vector store at {settings.chroma_path}")
+    logger.info(f"creating vector store at {settings.chroma_path}")
     settings.chroma_path.mkdir(parents=True, exist_ok=True)
 
     # Clear existing vector store contents (can't delete mount point)
     if (settings.chroma_path / "chroma.sqlite3").exists():
-        print("Clearing existing vector store")
+        logger.info("clearing existing vector store")
         import shutil
 
         for item in settings.chroma_path.iterdir():
@@ -113,19 +116,21 @@ def create_vector_store(chunks):
             else:
                 item.unlink()
 
-    print("Generating embeddings and storing in ChromaDB...")
-    vector_store = Chroma.from_documents(
+    logger.info("generating embeddings and storing in ChromaDB")
+    _vector_store = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
         persist_directory=str(settings.chroma_path),
     )
 
-    print(f"Successfully created vector store with {len(chunks)} chunks")
+    logger.info(f"successfully created vector store with {len(chunks)} chunks")
 
 
 def main():
     """Run the full ingestion pipeline."""
-    print("=== Shadowrun Lore RAG Ingestion ===\n")
+    setup_logging(settings.log_level)
+
+    logger.info("shadowrun lore RAG ingestion started")
 
     # Step 1: Convert PDFs to markdown
     convert_pdfs_to_markdown()
@@ -136,7 +141,7 @@ def main():
     # Step 3: Create vector store
     create_vector_store(chunks)
 
-    print("\n=== Ingestion complete ===")
+    logger.info("shadowrun lore RAG ingestion complete")
 
 
 if __name__ == "__main__":

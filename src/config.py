@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Retrieval settings
     top_k: int = 5
 
+    # Logging
+    log_level: str = "INFO"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

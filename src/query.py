@@ -9,16 +9,16 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 from config import settings
+from logs import logger
 
 
 def load_vector_store():
     """Load the existing ChromaDB vector store."""
     if not settings.chroma_path.exists():
-        print(f"Error: Vector store not found at {settings.chroma_path}")
-        print("Run ingest.py first to create the vector store")
+        logger.error(f"error: vector store not found at {settings.chroma_path}")
         sys.exit(1)
 
-    print(f"Loading vector store from {settings.chroma_path}")
+    logger.info(f"loading vector store from {settings.chroma_path}")
     embeddings = OllamaEmbeddings(
         model=settings.embedding_model,
         base_url=settings.ollama_host,
@@ -70,28 +70,28 @@ Answer:"""
 
 def query(question: str, show_sources: bool = False):
     """Query the RAG system."""
-    print(f"Using model: {settings.llm_model}")
-    print(f"Retrieving top {settings.top_k} relevant chunks\n")
+    logger.info(f"using model: {settings.llm_model}")
+    logger.info(f"retrieving top {settings.top_k} relevant chunks\n")
 
     vector_store = load_vector_store()
     rag_chain, retriever = create_rag_chain(vector_store)
 
-    print(f"Question: {question}\n")
-    print("Generating answer...\n")
+    logger.debug(f"question: {question}\n")
+    logger.debug("generating answer...\n")
 
     answer = rag_chain.invoke(question)
 
-    print("Answer:")
-    print(answer)
+    logger.debug("Answer:")
+    logger.debug(answer)
 
     if show_sources:
         docs = retriever.invoke(question)
-        print("\n" + "=" * 80)
-        print("Sources:")
+        logger.debug("\n" + "=" * 80)
+        logger.debug("sources:")
         for i, doc in enumerate(docs, 1):
             source = doc.metadata.get("source", "Unknown")
-            print(f"\n[{i}] {source}")
-            print(doc.page_content[:200] + "...")
+            logger.debug(f"\n[{i}] {source}")
+            logger.debug(doc.page_content[:200] + "...")
 
 
 def main():
