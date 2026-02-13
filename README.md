@@ -112,5 +112,6 @@ ssh $HOMELAB_HOST nvidia-smi
 
 ```sh
 docker exec -it shadowrun-rag uv run python src/query.py "What is essence in Shadowrun?"
+docker exec -it shadowrun-rag uv run python src/query.py "What is Tír Tairngire"
 docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
 ```

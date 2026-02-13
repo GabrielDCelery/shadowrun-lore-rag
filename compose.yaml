@@ -7,6 +7,7 @@ services:
       - DATA_PATH=/data
       - LLM_MODEL=llama3.1:8b
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - TOP_K=12
     volumes:
       - /srv/shadowrun-rag/pdfs:/data/pdfs:ro
       - /srv/shadowrun-rag/extracted:/data/extracted
