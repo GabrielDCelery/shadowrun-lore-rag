@@ -10,13 +10,17 @@ Shadowrun is an RPG from the 90s that I have fond memories of. After reading [th
 
 ## Architecture
 
-- **Language/Framework**: Python 3.12
-- **Database**: ChromaDB (file-based vector store)
-- **Hosting**: Homelab (Docker)
-- **Messaging**: None
-- **Storage**: Local filesystem (`/srv/shadowrun-rag/`)
-- **Provisioning**: None
-- **External APIs**: Ollama (LLM and embeddings)
+Two Docker containers running on homelab hardware with NVIDIA GPU access:
+
+- **shadowrun-rag**: Python 3.12 application (uv for dependency management)
+- **ollama-rag**: Ollama server for LLM inference and embeddings
+
+Data stored on host at `/srv/shadowrun-rag/` and mounted into containers:
+
+- `pdfs/` - source rulebook PDFs
+- `extracted/` - markdown output from marker-pdf
+- `chroma_db/` - ChromaDB vector database (file-based)
+- `model_cache/` - marker-pdf model cache
 
 ```
 PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
@@ -24,13 +28,14 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
                            query → retrieve → Ollama LLM → answer
 ```
 
-| Component      | Choice                                      |
-| -------------- | ------------------------------------------- |
-| PDF extraction | marker-pdf                                  |
-| Chunking       | langchain text splitters (markdown-aware)   |
-| Embeddings     | Ollama `mxbai-embed-large`                  |
-| Vector store   | ChromaDB                                    |
-| LLM            | Ollama (configurable: llama3.1:8b, mistral) |
+| Component      | Choice                                    |
+| -------------- | ----------------------------------------- |
+| PDF extraction | marker-pdf                                |
+| Chunking       | langchain-text-splitters (markdown-aware) |
+| Embeddings     | Ollama `mxbai-embed-large`                |
+| Vector store   | ChromaDB (via langchain-chroma)           |
+| LLM            | Ollama `llama3.1:8b` (configurable)       |
+| Orchestration  | langchain + langchain-ollama              |
 
 ## Development / Deployment
 
@@ -70,6 +75,8 @@ docker compose down && docker compose up -d
 5. Run the following scripts from the `development machine`
 
 ```sh
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull mxbai-embed-large
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull llama3.1:8b
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/ingest.py
 # Or run this if you are running the containers locally
 # docker exec shadowrun-rag uv run python src/ingest.py
