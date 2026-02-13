@@ -81,17 +81,17 @@ def query(question: str, show_sources: bool = False):
 
     answer = rag_chain.invoke(question)
 
-    logger.debug("Answer:")
-    logger.debug(answer)
+    print("Answer:")
+    print(answer)
 
     if show_sources:
         docs = retriever.invoke(question)
-        logger.debug("\n" + "=" * 80)
-        logger.debug("sources:")
+        print("\n" + "=" * 80)
+        print("Sources:")
         for i, doc in enumerate(docs, 1):
             source = doc.metadata.get("source", "Unknown")
-            logger.debug(f"\n[{i}] {source}")
-            logger.debug(doc.page_content[:200] + "...")
+            print(f"\n[{i}] {source}")
+            print(doc.page_content[:200] + "...")
 
 
 def main():
