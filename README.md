@@ -1,8 +1,8 @@
-# What is this project?
+# Shadowrun Lore RAG
 
-Shadowrun is a Role-playing game from the 90s that I grew up with and got very fond memories of. This is a project idea that I have been toying with for a while but when I saw this article [Guide to RAG embeddings](https://medium.com/@sharanharsoor/the-complete-guide-to-embeddings-and-rag-from-theory-to-production-758a16d747ac) I decided to put things into action.
+A RAG system for querying Shadowrun RPG rulebooks using natural language. Runs on a homelab with Ollama.
 
-Here we are, a RAG system for querying Shadowrun RPG rulebooks using natural language. Runs on a homelab with Ollama.
+Shadowrun is an RPG from the 90s that I have fond memories of. After reading [this guide on RAG embeddings](https://medium.com/@sharanharsoor/the-complete-guide-to-embeddings-and-rag-from-theory-to-production-758a16d747ac), I finally put the idea into action.
 
 ![Screenshot Shadowrun 03](./assets/screenshot-shadowrun-03.jpg)
 ![Screenshot Shadowrun 01](./assets/screenshot-shadowrun-01.jpg)
