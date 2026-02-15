@@ -37,16 +37,8 @@ def convert_pdfs_to_markdown():
 
         # Initialize marker-pdf models
         logger.info(f"loading marker-pdf models...")
-        model_dict = create_model_dict(
-            device="cuda",  # Force GPU usage
-            dtype="bfloat16",  # Better stability than float16, same speed
-        )
-        converter = PdfConverter(
-            artifact_dict=model_dict,
-            config={
-                "disable_image_extraction": True,  # Don't save images, just OCR text
-            },
-        )
+        model_dict = create_model_dict()
+        converter = PdfConverter(artifact_dict=model_dict)
 
         logger.info(f"converting {pdf_file.name}")
 
