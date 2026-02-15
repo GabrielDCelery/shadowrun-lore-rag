@@ -25,6 +25,7 @@ services:
       - EMBEDDING_MODEL=mxbai-embed-large
       - LLM_MODEL=llama3.1:8b
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - PYTORCH_ALLOC_CONF=expandable_segments:True
       - TOP_K=12
       - LOG_LEVEL=INFO
       - EMBEDDING_BATCH_SIZE=100

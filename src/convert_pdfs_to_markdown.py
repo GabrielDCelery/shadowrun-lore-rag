@@ -3,8 +3,10 @@
 import gc
 import sys
 
+import torch
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
+from torch.cuda import is_available
 
 from config import settings
 from logs import logger, setup_logging
@@ -56,6 +58,9 @@ def convert_pdfs_to_markdown():
             del converter
             del model_dict
             gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
 
 def main():
