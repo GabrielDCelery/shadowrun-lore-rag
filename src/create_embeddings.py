@@ -92,19 +92,15 @@ def create_vector_store(chunks: list[Document]):
                 persist_directory=str(settings.chroma_path),
             )
         else:
-            texts = [doc.page_content for doc in batch]
-            metadatas = [doc.metadata for doc in batch]
             try:
-                vector_store.add_texts(texts=texts, metadatas=metadatas)
+                vector_store.add_documents(batch)
             except Exception as e:
                 logger.warning(f"batch {curr_batch} failed: {e}, trying individually")
-                for idx, (text, metadata) in enumerate(zip(texts, metadatas)):
+                for idx, document in enumerate(batch):
                     try:
-                        vector_store.add_texts(texts=[text], metadatas=[metadata])
+                        vector_store.add_documents([document])
                     except Exception:
-                        logger.error(
-                            f"skipping chunk {i+idx} (length: {len(text)}) chars)"
-                        )
+                        logger.error(f"skipping chunk {i+idx}")
 
     logger.info(f"successfully created vector store with {len(chunks)} chunks")
 
