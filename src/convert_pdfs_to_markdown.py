@@ -1,5 +1,6 @@
 """Ingest PDFs into the RAG system."""
 
+import gc
 import sys
 
 from marker.converters.pdf import PdfConverter
@@ -26,19 +27,21 @@ def convert_pdfs_to_markdown():
 
     settings.extracted_path.mkdir(parents=True, exist_ok=True)
 
-    # Initialize marker-pdf models
-    logger.info(f"loading marker-pdf models...")
-    model_dict = create_model_dict()
-    converter = PdfConverter(artifact_dict=model_dict)
-
     for pdf_file in pdf_files:
+
         output_file = settings.extracted_path / f"{pdf_file.stem}.md"
 
         if output_file.exists():
             logger.info(f"skipping {pdf_file.name} (already extracted)")
             continue
 
+        # Initialize marker-pdf models
+        logger.info(f"loading marker-pdf models...")
+        model_dict = create_model_dict()
+        converter = PdfConverter(artifact_dict=model_dict)
+
         logger.info(f"converting {pdf_file.name}")
+
         try:
             rendered = converter(str(pdf_file))
 
@@ -48,6 +51,11 @@ def convert_pdfs_to_markdown():
             logger.info(f"saved to {output_file.name}")
         except Exception as e:
             logger.error(f"error converting {pdf_file.name}: {e}")
+        finally:
+            logger.info(f"tear down marker-pdf models")
+            del converter
+            del model_dict
+            gc.collect()
 
 
 def main():
