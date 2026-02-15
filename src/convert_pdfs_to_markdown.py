@@ -6,7 +6,6 @@ import sys
 import torch
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
-from torch.cuda import is_available
 
 from config import settings
 from logs import logger, setup_logging
