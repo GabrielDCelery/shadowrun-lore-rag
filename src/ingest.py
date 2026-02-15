@@ -4,6 +4,7 @@ import math
 
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import DirectoryLoader, TextLoader, text
+from langchain_core import documents
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import MarkdownTextSplitter
@@ -76,8 +77,13 @@ def create_vector_store(chunks: list[Document]):
 
     logger.info("generating embeddings and storing in ChromaDB")
 
+    vector_store = Chroma.from_documents(
+        documents=[],
+        embedding=embeddings,
+        persist_directory=str(settings.chroma_path),
+    )
+
     batch_size = settings.embedding_batch_size
-    vector_store = None
 
     for i in range(0, len(chunks), batch_size):
         batch = chunks[i : i + batch_size]
@@ -85,16 +91,12 @@ def create_vector_store(chunks: list[Document]):
         total_batch_count = math.ceil(len(chunks) / batch_size)
         logger.info(f"processing batch {curr_batch}/{total_batch_count}")
 
-        if vector_store is None:
-            vector_store = Chroma.from_documents(
-                documents=batch,
-                embedding=embeddings,
-                persist_directory=str(settings.chroma_path),
-            )
-        else:
-            texts = [doc.page_content for doc in batch]
-            metadatas = [doc.metadata for doc in batch]
+        texts = [doc.page_content for doc in batch]
+        metadatas = [doc.metadata for doc in batch]
+        try:
             vector_store.add_texts(metadatas=metadatas, texts=texts)
+        except Exception as e:
+            logger.warning(f"batch {curr_batch} failed: {e}, skipping")
 
     logger.info(f"successfully created vector store with {len(chunks)} chunks")
 
