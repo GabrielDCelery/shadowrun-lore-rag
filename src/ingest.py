@@ -1,57 +1,15 @@
 """Ingest PDFs into the RAG system."""
 
-import sys
+import math
 
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain_community.document_loaders import DirectoryLoader, TextLoader, text
+from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import MarkdownTextSplitter
-from marker.converters.pdf import PdfConverter
-from marker.models import create_model_dict
 
 from config import settings
 from logs import logger, setup_logging
-
-
-def convert_pdfs_to_markdown():
-    """Convert PDFs to markdown using marker-pdf."""
-    logger.info(f"looking for PDFs in {settings.pdf_path}")
-
-    if not settings.pdf_path.exists():
-        logger.error(f"pdf path {settings.pdf_path} does not exist")
-        sys.exit(1)
-
-    pdf_files = list(settings.pdf_path.glob("*.pdf"))
-    if not pdf_files:
-        logger.info(f"no PDF files found in {settings.pdf_path}")
-        return
-
-    logger.info(f"found {len(pdf_files)} PDF files for extraction")
-
-    settings.extracted_path.mkdir(parents=True, exist_ok=True)
-
-    # Initialize marker-pdf models
-    logger.info(f"loading marker-pdf models...")
-    model_dict = create_model_dict()
-    converter = PdfConverter(artifact_dict=model_dict)
-
-    for pdf_file in pdf_files:
-        output_file = settings.extracted_path / f"{pdf_file.stem}.md"
-
-        if output_file.exists():
-            logger.info(f"skipping {pdf_file.name} (already extracted)")
-            continue
-
-        logger.info(f"converting {pdf_file.name}")
-        try:
-            rendered = converter(str(pdf_file))
-
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(rendered.markdown)
-
-            logger.info(f"saved to {output_file.name}")
-        except Exception as e:
-            logger.error(f"error converting {pdf_file.name}: {e}")
 
 
 def load_and_chunk_documents():
@@ -88,7 +46,7 @@ def load_and_chunk_documents():
     return chunks
 
 
-def create_vector_store(chunks):
+def create_vector_store(chunks: list[Document]):
     """Create embeddings and store in ChromaDB."""
     if not chunks:
         logger.info("no chunks to process")
@@ -117,11 +75,26 @@ def create_vector_store(chunks):
                 item.unlink()
 
     logger.info("generating embeddings and storing in ChromaDB")
-    _vector_store = Chroma.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        persist_directory=str(settings.chroma_path),
-    )
+
+    batch_size = settings.embedding_batch_size
+    vector_store = None
+
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i : i + batch_size]
+        curr_batch = math.floor(i / batch_size) + 1
+        total_batch_count = math.ceil(len(chunks) / batch_size)
+        logger.info(f"processing batch {curr_batch}/{total_batch_count}")
+
+        if vector_store is None:
+            vector_store = Chroma.from_documents(
+                documents=batch,
+                embedding=embeddings,
+                persist_directory=str(settings.chroma_path),
+            )
+        else:
+            texts = [doc.page_content for doc in batch]
+            metadatas = [doc.metadata for doc in batch]
+            vector_store.add_texts(metadatas=metadatas, texts=texts)
 
     logger.info(f"successfully created vector store with {len(chunks)} chunks")
 
@@ -131,9 +104,6 @@ def main():
     setup_logging(settings.log_level)
 
     logger.info("shadowrun lore RAG ingestion started")
-
-    # Step 1: Convert PDFs to markdown
-    convert_pdfs_to_markdown()
 
     # Step 2: Load and chunk documents
     chunks = load_and_chunk_documents()

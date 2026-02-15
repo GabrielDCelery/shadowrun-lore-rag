@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Retrieval settings
     top_k: int = 5
 
+    # Embedding config
+    embedding_batch_size: int = 10
+
     # Logging
     log_level: str = "INFO"
 
