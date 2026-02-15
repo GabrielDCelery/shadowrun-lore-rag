@@ -77,8 +77,8 @@ docker compose down && docker compose up -d
 ```sh
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull mxbai-embed-large
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull llama3.1:8b
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/ingest.py
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/ingest.py
 # Or run this if you are running the containers locally
 # docker exec shadowrun-rag uv run python src/ingest.py
 # This will:
