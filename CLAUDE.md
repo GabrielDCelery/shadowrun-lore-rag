@@ -35,32 +35,35 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 2. Create docker context for remote: `docker context create shadowrun-rag --docker "host=ssh://user@host"`
 3. `docker context use shadowrun-rag`
 4. `docker compose build && docker compose up -d`
-5. Ingest: `docker exec shadowrun-rag uv run python src/ingest.py`
-6. Query: `docker exec -it shadowrun-rag uv run python src/query.py "your question"`
+5. Convert PDFs: `docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py`
+6. Create embeddings: `docker exec shadowrun-rag uv run python src/create_embeddings.py`
+7. Query: `docker exec -it shadowrun-rag uv run python src/query.py "your question"`
 
 ## Key Files
 
-| File            | Purpose                                       |
-| --------------- | --------------------------------------------- |
-| `src/ingest.py` | Convert PDFs, chunk, embed, store in ChromaDB |
-| `src/query.py`  | CLI interface to ask questions                |
-| `src/config.py` | Pydantic settings (paths, models, tuning)     |
-| `src/logs.py`   | Logging configuration                         |
-| `compose.yaml`  | Container config for RAG app + Ollama         |
-| `Dockerfile`    | Python 3.12 + uv + marker-pdf dependencies    |
+| File                              | Purpose                                        |
+| --------------------------------- | ---------------------------------------------- |
+| `src/convert_pdfs_to_markdown.py` | Convert PDFs to markdown using marker-pdf      |
+| `src/create_embeddings.py`        | Chunk markdown, create embeddings, store in DB |
+| `src/query.py`                    | CLI interface to ask questions                 |
+| `src/config.py`                   | Pydantic settings (paths, models, tuning)      |
+| `src/logs.py`                     | Logging configuration                          |
+| `compose.yaml`                    | Container config for RAG app + Ollama          |
+| `Dockerfile`                      | Python 3.12 + uv + marker-pdf dependencies     |
 
 ## Environment Variables
 
-| Variable          | Description                  | Default                   |
-| ----------------- | ---------------------------- | ------------------------- |
-| `OLLAMA_HOST`     | Ollama API URL               | `http://ollama-rag:11434` |
-| `EMBEDDING_MODEL` | Ollama model for embeddings  | `mxbai-embed-large`       |
-| `LLM_MODEL`       | Ollama model for answers     | `llama3.1:8b`             |
-| `DATA_PATH`       | Base path for data files     | `/srv/shadowrun-rag`      |
-| `CHUNK_SIZE`      | Text chunk size (characters) | `1000`                    |
-| `CHUNK_OVERLAP`   | Overlap between chunks       | `200`                     |
-| `TOP_K`           | Number of chunks to retrieve | `5`                       |
-| `LOG_LEVEL`       | Logging level                | `INFO`                    |
+| Variable                | Description                       | Default                   |
+| ----------------------- | --------------------------------- | ------------------------- |
+| `OLLAMA_HOST`           | Ollama API URL                    | `http://ollama-rag:11434` |
+| `EMBEDDING_MODEL`       | Ollama model for embeddings       | `mxbai-embed-large`       |
+| `LLM_MODEL`             | Ollama model for answers          | `llama3.1:8b`             |
+| `DATA_PATH`             | Base path for data files          | `/srv/shadowrun-rag`      |
+| `CHUNK_SIZE`            | Text chunk size (characters)      | `1000`                    |
+| `CHUNK_OVERLAP`         | Overlap between chunks            | `200`                     |
+| `TOP_K`                 | Number of chunks to retrieve      | `5`                       |
+| `EMBEDDING_BATCH_SIZE`  | Batch size for embedding creation | `10`                      |
+| `LOG_LEVEL`             | Logging level                     | `INFO`                    |
 
 ## Decisions
 
