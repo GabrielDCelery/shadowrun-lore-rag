@@ -3,8 +3,7 @@
 import math
 
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import DirectoryLoader, TextLoader, text
-from langchain_core import documents
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import MarkdownTextSplitter
@@ -96,9 +95,16 @@ def create_vector_store(chunks: list[Document]):
             texts = [doc.page_content for doc in batch]
             metadatas = [doc.metadata for doc in batch]
             try:
-                vector_store.add_texts(metadatas=metadatas, texts=texts)
+                vector_store.add_texts(texts=texts, metadatas=metadatas)
             except Exception as e:
-                logger.warning(f"batch {curr_batch} failed: {e}, skipping")
+                logger.warning(f"batch {curr_batch} failed: {e}, trying individually")
+                for idx, (text, metadata) in enumerate(zip(texts, metadatas)):
+                    try:
+                        vector_store.add_texts(texts=[text], metadatas=[metadata])
+                    except Exception:
+                        logger.error(
+                            f"skipping chunk {i+idx} (length: {len(text)}) chars)"
+                        )
 
     logger.info(f"successfully created vector store with {len(chunks)} chunks")
 
