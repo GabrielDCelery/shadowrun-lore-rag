@@ -26,4 +26,4 @@ COPY src/ ./src/
 ENV PYTHONPATH=/app/src
 
 # Default command (can be overridden in compose)
-CMD ["uv", "run", "python", "src/ingest.py"]
+CMD ["uv", "run", "python", "src/create_embeddings.py"]
