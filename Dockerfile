@@ -23,7 +23,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY src/ ./src/
 
 # Set Python path
-ENV PYTHONPATH=/app/src
+ENV PYTHONPATH=/app/src 
+
+ARG USERNAME=gaze
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN groupadd -g ${USER_GID} ${USERNAME} && \
+    useradd -m -u ${USER_UID} -g ${USER_GID} ${USERNAME}
+USER ${USERNAME}
+ENV HOME=/home/${USERNAME}
 
 # Default command (can be overridden in compose)
 CMD ["uv", "run", "python", "src/create_embeddings.py"]

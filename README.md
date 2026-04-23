@@ -39,8 +39,10 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 
 ## Development / Deployment
 
+Deployment is managed via the `personal-homelab` repo. The `compose.yaml` for this service lives there.
+
 1. Set up `.env` file on the `development machine`
-2. Set up necessary dir structure on the `remote machine` you want to run the containers on
+2. Set up necessary dir structure on the `remote machine`
 
 ```sh
 /srv/ollama/        # mount point for ollama
@@ -58,25 +60,13 @@ sudo chown -R $SHDWRN_REMOTE_USER :$SHDWRN_REMOTE_USER /srv/shadowrun-rag
 # place the pdfs into /srv/shadowrun-rag/pdfs
 ```
 
-3. Create a docker context for the `remote machine` where the containers will be running (or skip this step if you are runnig the containers)
+3. Deploy via `personal-homelab` repo (builds image and starts containers)
+
+4. Run the following scripts from the `development machine`
 
 ```sh
-docker context create shadowrun-rag --docker "host=ssh://$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST"
-docker context use shadowrun-rag
-```
-
-4. Build and deploy the compose file from the `deployment machine`
-
-```sh
-docker compose build
-docker compose down && docker compose up -d
-```
-
-5. Run the following scripts from the `development machine`
-
-```sh
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull mxbai-embed-large
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama-rag ollama pull llama3.1:8b
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama ollama pull mxbai-embed-large
+ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama ollama pull llama3.1:8b
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/create_embeddings.py
 # Or run this if you are running the containers locally

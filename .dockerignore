@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+.claude/
+docs/
+mise.toml
+organize_sourcebooks.py
+a.md

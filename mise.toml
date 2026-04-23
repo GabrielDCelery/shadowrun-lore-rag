@@ -4,3 +4,23 @@ uv = "0.9.26"
 
 [env]
 _.file = { path = '.env' }
+
+[tasks.build]
+description = "Build Docker image for homelab registry"
+# run = "docker build -t 10.83.16.99:5000/homelab/shadowrun-rag:latest ."
+run = "docker build -t shadowrun-rag:latest ."
+
+[tasks.push]
+description = "Push image to local homelab registry"
+run = """
+docker tag shadowrun-rag:latest $REGISTRY_HOST/homelab/shadowrun-rag:latest
+docker push $REGISTRY_HOST/homelab/shadowrun-rag:latest
+"""
+
+[tasks.publish]
+description = "Build and push image to local homelab registry"
+run = [{ task = "build" }, { task = "push" }]
+
+[tasks.validate]
+description = "Build and push image to local homelab registry"
+run = "curl --silent $REGISTRY_HOST/v2/homelab/shadowrun-rag/tags/list"

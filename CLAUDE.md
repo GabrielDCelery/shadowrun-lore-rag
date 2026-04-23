@@ -21,7 +21,7 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 
 ## Infrastructure
 
-- **This repo:** Application code + compose.yaml (runs both RAG app and Ollama)
+- **This repo:** Application code + Dockerfile only — deployment is managed via `personal-homelab` repo
 - **Ollama:** Runs in Docker container (`ollama-rag`) with GPU access
 - **Data path:** `/srv/shadowrun-rag/` on homelab (mounted into container as `/data`)
   - `pdfs/` - source PDFs (read-only)
@@ -32,12 +32,10 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 ## Development Workflow
 
 1. Edit code locally on laptop
-2. Create docker context for remote: `docker context create shadowrun-rag --docker "host=ssh://user@host"`
-3. `docker context use shadowrun-rag`
-4. `docker compose build && docker compose up -d`
-5. Convert PDFs: `docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py`
-6. Create embeddings: `docker exec shadowrun-rag uv run python src/create_embeddings.py`
-7. Query: `docker exec -it shadowrun-rag uv run python src/query.py "your question"`
+2. Push changes — `personal-homelab` repo handles building the image and deploying
+3. Convert PDFs: `ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py`
+4. Create embeddings: `ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/create_embeddings.py`
+5. Query: `ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -it shadowrun-rag uv run python src/query.py "your question"`
 
 ## Key Files
 
@@ -48,7 +46,6 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 | `src/query.py`                    | CLI interface to ask questions                 |
 | `src/config.py`                   | Pydantic settings (paths, models, tuning)      |
 | `src/logs.py`                     | Logging configuration                          |
-| `compose.yaml`                    | Container config for RAG app + Ollama          |
 | `Dockerfile`                      | Python 3.12 + uv + marker-pdf dependencies     |
 
 ## Environment Variables

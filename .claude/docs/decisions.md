@@ -71,6 +71,8 @@ Goal: Build a RAG system that can answer questions about Shadowrun lore.
 
 **Decision:** Git push + `deploy.sh` script that SSHs to homelab, pulls, builds, and restarts. Simple and good enough for personal use.
 
+**Update (2026-04-21):** `compose.yaml` moved to `personal-homelab` repo. Deployment is now managed from there. This repo contains application code and `Dockerfile` only.
+
 ### Repo Separation
 
 **Question:** Should RAG code live in `personal-homelab` repo or separate?
@@ -104,6 +106,69 @@ Want to preserve project context and decisions so future Claude sessions can pic
 - `CLAUDE.md` at project root - concise current state, auto-read by Claude Code
 - `.claude/docs/decisions.md` - detailed decision log (this file)
 - `README.md` - human-focused quick start (separate concern)
+
+---
+
+## 2026-04-07: PDF Extraction and Table Handling
+
+### Context
+
+Shadowrun sourcebooks are scanned PDFs (mixed quality — mostly good, some medium). Need to decide
+how to handle extraction, table chunking, and whether to restructure table data for better RAG
+retrieval.
+
+### PDF Extraction
+
+marker-pdf with GPU is the right tool. It uses surya OCR which handles medium-quality scans better
+than Tesseract. Alternatives considered:
+
+| Option                   | Notes                                                                |
+| ------------------------ | -------------------------------------------------------------------- |
+| **marker-pdf (current)** | Best for mixed-quality scans, markdown-aware output, GPU-accelerated |
+| OCRmyPDF + pdfminer      | Faster pipeline but Tesseract struggles on degraded scans            |
+| surya standalone         | Lighter but raw text output, no markdown structure                   |
+| EasyOCR                  | Handles medium quality but slower, less markdown-aware               |
+
+**Decision:** Keep marker-pdf. Do NOT disable image extraction — Shadowrun books have callout boxes
+and styled sidebars that may be detected as image regions but contain rules text. Disabling image
+extraction risks silent content loss.
+
+### Table Chunking Problem
+
+`MarkdownTextSplitter` (current) has no awareness of tables. It splits at character boundaries and
+will cut through markdown tables mid-row. A chunk starting mid-table with no headers is semantically
+useless for retrieval.
+
+**Decision:** Implement table-aware chunking. See `.claude/docs/table-handling.md` for detail.
+
+### Table Embedding Format
+
+Raw markdown table syntax (`| col | col |`) is noise for embedding models trained on prose.
+Row-as-sentence conversion significantly improves semantic matching for item-specific queries.
+
+| Format                            | Semantic quality | Notes                                 |
+| --------------------------------- | ---------------- | ------------------------------------- | ------------------------------------------ |
+| Raw markdown table                | Low              | `                                     | ` characters are noise to embedding models |
+| JSON per row                      | Medium           | Better but still not natural language |
+| Natural language sentence per row | High             | Matches how users query               |
+
+**Decision:** Convert table rows to natural language sentences during ingestion. Each row becomes a
+self-contained document with column headers baked in. See `.claude/docs/table-handling.md`.
+
+Column-oriented conversion (one document per column) was considered but rejected — it adds
+complexity with minimal gain, and comparative queries are a retrieval architecture problem that
+column embeddings don't solve.
+
+### Comparative Queries
+
+RAG alone cannot answer comparative/filtering queries ("cheapest pistol", "highest damage weapon",
+"availability under 6"). These require all rows to be available simultaneously for comparison, which
+conflicts with chunked retrieval.
+
+**Decision:** Planned future work — add DuckDB as a parallel structured store alongside ChromaDB.
+Tables get stored in both. A query router detects comparison intent and routes to DuckDB (SQL) vs
+ChromaDB (semantic). `llama3.1:8b` can generate basic SQL from natural language. See
+`.claude/docs/table-handling.md` for the planned pipeline.
 
 ---
 
