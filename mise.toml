@@ -5,38 +5,37 @@ uv = "0.9.26"
 [env]
 _.file = { path = '.env' }
 
-[tasks.build]
+[tasks."image:build"]
 description = "Build Docker image for homelab registry"
-# run = "docker build -t 10.83.16.99:5000/homelab/shadowrun-rag:latest ."
 run = "docker build -t shadowrun-rag:latest ."
 
-[tasks.push]
+[tasks."image:push"]
 description = "Push image to local homelab registry"
 run = """
 docker tag shadowrun-rag:latest $REGISTRY_HOST/homelab/shadowrun-rag:latest
 docker push $REGISTRY_HOST/homelab/shadowrun-rag:latest
 """
 
-[tasks.publish]
+[tasks."image:publish"]
 description = "Build and push image to local homelab registry"
-run = [{ task = "build" }, { task = "push" }]
+run = [{ task = "image:build" }, { task = "image:push" }]
 
-[tasks.validate]
-description = "Build and push image to local homelab registry"
+[tasks."image:validate"]
+description = "Check image exists in local homelab registry"
 run = "curl --silent $REGISTRY_HOST/v2/homelab/shadowrun-rag/tags/list"
 
-[tasks.normalise]
+[tasks."run:normalise"]
 description = "Normalise PDF filenames from pdfs_raw/ to pdfs_normalised/"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/normalise_pdf_filenames.py"
 
-[tasks.convert]
+[tasks."run:convert"]
 description = "Convert normalised PDFs to markdown"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py"
 
-[tasks.embed]
+[tasks."run:embed"]
 description = "Create embeddings from markdown files"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/create_embeddings.py"
 
-[tasks.query]
-description = "Query the RAG system — pass your question as an argument e.g. mise run query -- 'What is Tir Tairngire'"
+[tasks."run:query"]
+description = "Query the RAG system — pass your question as an argument e.g. mise run run:query -- 'What is Tir Tairngire'"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -it shadowrun-rag uv run python src/query.py \"${@}\""
