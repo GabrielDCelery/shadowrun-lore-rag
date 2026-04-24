@@ -5,7 +5,7 @@ A RAG system for querying Shadowrun RPG rulebooks using natural language. Runs o
 ## Architecture
 
 ```
-pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown/ → chunks → embeddings → ChromaDB
+pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown_extracted/ → postprocess → markdown/ → chunks → embeddings → ChromaDB
                                                                                               ↓
                                                           query → retrieve → Ollama LLM → answer
 ```

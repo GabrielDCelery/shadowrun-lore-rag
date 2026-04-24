@@ -38,6 +38,10 @@ class Settings(BaseSettings):
         return self.data_path / "pdfs_normalised"
 
     @property
+    def markdown_extracted_path(self) -> Path:
+        return self.data_path / "markdown_extracted"
+
+    @property
     def markdown_path(self) -> Path:
         return self.data_path / "markdown"
 

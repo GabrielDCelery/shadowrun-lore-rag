@@ -26,11 +26,11 @@ def convert_pdfs_to_markdown():
 
     logger.info(f"found {len(pdf_files)} PDF files for extraction")
 
-    settings.markdown_path.mkdir(parents=True, exist_ok=True)
+    settings.markdown_extracted_path.mkdir(parents=True, exist_ok=True)
 
     for pdf_file in pdf_files:
 
-        output_file = settings.markdown_path / f"{pdf_file.stem}.md"
+        output_file = settings.markdown_extracted_path / f"{pdf_file.stem}.md"
 
         if output_file.exists():
             logger.info(f"skipping {pdf_file.name} (already extracted)")
@@ -39,7 +39,13 @@ def convert_pdfs_to_markdown():
         # Initialize marker-pdf models
         logger.info(f"loading marker-pdf models...")
         model_dict = create_model_dict()
-        converter = PdfConverter(artifact_dict=model_dict)
+        converter = PdfConverter(
+            artifact_dict=model_dict,
+            config={
+                "drop_repeated_text": True,
+                "disable_ocr_math": True,
+            },
+        )
 
         logger.info(f"converting {pdf_file.name}")
 

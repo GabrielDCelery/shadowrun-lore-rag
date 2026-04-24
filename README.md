@@ -42,7 +42,8 @@ Deployment is managed via the `personal-homelab` repo. The `compose.yaml` for th
 /srv/shadowrun-rag/
 ├── pdfs_raw/                 # drop raw PDFs here (upload via filebrowser)
 ├── pdfs_normalised/          # normalised copies, read by extraction pipeline
-├── markdown/                 # markdown output from marker-pdf
+├── markdown_extracted/       # raw markdown output from marker-pdf
+├── markdown/                 # post-processed markdown, fed into embeddings
 ├── chroma_db/                # ChromaDB vector database
 └── model_cache/              # marker-pdf model cache
 ```
@@ -50,7 +51,7 @@ Deployment is managed via the `personal-homelab` repo. The `compose.yaml` for th
 ```sh
 # On the remote machine
 sudo mkdir -p /srv/ollama
-sudo mkdir -p /srv/shadowrun-rag/{pdfs_raw,pdfs_normalised,markdown,chroma_db,model_cache}
+sudo mkdir -p /srv/shadowrun-rag/{pdfs_raw,pdfs_normalised,markdown_extracted,markdown,chroma_db,model_cache}
 sudo chown -R $SHDWRN_REMOTE_USER:$SHDWRN_REMOTE_USER /srv/shadowrun-rag
 ```
 
