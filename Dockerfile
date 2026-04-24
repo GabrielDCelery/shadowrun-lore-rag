@@ -25,12 +25,13 @@ COPY src/ ./src/
 # Set Python path
 ENV PYTHONPATH=/app/src 
 
-ARG USERNAME=gaze
+ARG USERNAME=app
 ARG USER_UID=1000
 ARG USER_GID=1000
 
 RUN groupadd -g ${USER_GID} ${USERNAME} && \
-    useradd -m -u ${USER_UID} -g ${USER_GID} ${USERNAME}
+    useradd -m -u ${USER_UID} -g ${USER_GID} ${USERNAME} && \
+    chown -R ${USERNAME}:${USERNAME} /app
 USER ${USERNAME}
 ENV HOME=/home/${USERNAME}
 
