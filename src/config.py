@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     @property
     def markdown_path(self) -> Path:
-        return self.data_path / "markdown"
+        return self.data_path / "markdown_clean"
 
     @property
     def chroma_path(self) -> Path:
