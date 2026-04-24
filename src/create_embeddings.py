@@ -3,46 +3,41 @@
 import math
 
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
-from langchain_text_splitters import MarkdownTextSplitter
 
+from chunk_documents import chunk_markdown
 from config import settings
 from logs import logger, setup_logging
 
 
 def load_and_chunk_documents():
-    """Load markdown files and chunk them."""
+    """Load markdown files and chunk them using two-pass table-aware chunker."""
     logger.info(f"loading documents from {settings.markdown_path}")
 
-    if not settings.markdown_path.exists() or not list(
-        settings.markdown_path.glob("*.md")
-    ):
+    md_files = list(settings.markdown_path.glob("*.md"))
+    if not settings.markdown_path.exists() or not md_files:
         logger.info(f"no markdown files found in {settings.markdown_path}")
         return []
 
-    loader = DirectoryLoader(
-        str(settings.markdown_path),
-        glob="*.md",
-        loader_cls=TextLoader,
-        loader_kwargs={"encoding": "utf-8"},
-    )
-
-    documents = loader.load()
-    logger.info(f"loaded {len(documents)} documents")
-
+    logger.info(f"found {len(md_files)} markdown files")
     logger.info(
         f"chunking with size={settings.chunk_size}, overlap={settings.chunk_overlap}"
     )
-    text_splitter = MarkdownTextSplitter(
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
-    )
 
-    chunks = text_splitter.split_documents(documents)
-    logger.info(f"created {len(chunks)} chunks")
+    chunks: list[Document] = []
+    for md_file in md_files:
+        content = md_file.read_text(encoding="utf-8")
+        file_chunks = chunk_markdown(
+            content=content,
+            source=md_file.name,
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap,
+        )
+        logger.info(f"  {md_file.name} → {len(file_chunks)} chunks")
+        chunks.extend(file_chunks)
 
+    logger.info(f"created {len(chunks)} chunks total")
     return chunks
 
 

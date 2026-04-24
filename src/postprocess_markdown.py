@@ -6,6 +6,7 @@ Cleans:
 - Image reference lines (![](...))
 - Navigation bar lines (lines containing sidebar nav artifacts with page markers)
 - Malformed table rows (cells containing only punctuation/whitespace)
+- OCR hallucinations (a phrase repeated 5+ times on a single line)
 - Consecutive blank lines (collapsed to single blank line)
 
 Usage:
@@ -18,16 +19,19 @@ from config import settings
 from logs import logger, setup_logging
 
 # Matches standalone image reference lines
-IMAGE_RE = re.compile(r'^!\[.*?\]\(.*?\)\s*$')
+IMAGE_RE = re.compile(r"^!\[.*?\]\(.*?\)\s*$")
 
 # Matches navigation bar emoji used in Tir Tairngire and similar books
-NAV_EMOJI_RE = re.compile(r'[🗆🔲]')
+NAV_EMOJI_RE = re.compile(r"[🗆🔲]")
 
 # Navigation bar pattern: 2+ all-caps words followed by "Page N"
-NAV_BAR_RE = re.compile(r'(?:[A-Z]{3,}\s+){2,}Page\s+\d+.*')
+NAV_BAR_RE = re.compile(r"(?:[A-Z]{3,}\s+){2,}Page\s+\d+.*")
 
 # Malformed table row: all cells contain only punctuation/whitespace
-MALFORMED_TABLE_RE = re.compile(r'^\|[\s,\.;:!\?|]+\|$')
+MALFORMED_TABLE_RE = re.compile(r"^\|[\s,\.;:!\?|]+\|$")
+
+# OCR hallucination: a non-whitespace phrase of 10+ chars repeated 5+ times on a single line
+REPEATED_PHRASE_RE = re.compile(r"(\S.{9,})\1{5,}")
 
 
 def is_image_line(line: str) -> bool:
@@ -39,8 +43,8 @@ def clean_nav_bar(line: str) -> str:
     if not NAV_EMOJI_RE.search(line):
         return line
     # Strip the nav bar pattern and everything up to and including the emoji
-    cleaned = NAV_BAR_RE.sub('', line)
-    cleaned = NAV_EMOJI_RE.sub('', cleaned).strip()
+    cleaned = NAV_BAR_RE.sub("", line)
+    cleaned = NAV_EMOJI_RE.sub("", cleaned).strip()
     return cleaned
 
 
@@ -60,6 +64,11 @@ def postprocess(content: str) -> str:
         if is_malformed_table_row(line):
             continue
 
+        # if not line.strip().startswith("|"):
+        #     line = REPEATED_PHRASE_RE.sub(r"\1", line).strip()
+        #     if not line:
+        #         continue
+
         line = clean_nav_bar(line)
 
         # Collapse consecutive blank lines
@@ -70,14 +79,16 @@ def postprocess(content: str) -> str:
         output.append(line)
         prev_blank = is_blank
 
-    return '\n'.join(output)
+    return "\n".join(output)
 
 
 def main() -> None:
     setup_logging(settings.log_level)
 
     if not settings.markdown_extracted_path.exists():
-        logger.error(f"markdown extracted path {settings.markdown_extracted_path} does not exist")
+        logger.error(
+            f"markdown extracted path {settings.markdown_extracted_path} does not exist"
+        )
         return
 
     settings.markdown_path.mkdir(parents=True, exist_ok=True)
@@ -92,7 +103,9 @@ def main() -> None:
 
         original_lines = len(content.splitlines())
         cleaned_lines = len(cleaned.splitlines())
-        logger.info(f"  {original_lines} → {cleaned_lines} lines ({original_lines - cleaned_lines} removed)")
+        logger.info(
+            f"  {original_lines} → {cleaned_lines} lines ({original_lines - cleaned_lines} removed)"
+        )
 
 
 if __name__ == "__main__":
