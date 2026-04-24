@@ -13,24 +13,24 @@ from logs import logger, setup_logging
 
 def convert_pdfs_to_markdown():
     """Convert PDFs to markdown using marker-pdf."""
-    logger.info(f"looking for PDFs in {settings.pdf_path}")
+    logger.info(f"looking for PDFs in {settings.pdfs_normalised_path}")
 
-    if not settings.pdf_path.exists():
-        logger.error(f"pdf path {settings.pdf_path} does not exist")
+    if not settings.pdfs_normalised_path.exists():
+        logger.error(f"pdf path {settings.pdfs_normalised_path} does not exist")
         sys.exit(1)
 
-    pdf_files = list(settings.pdf_path.glob("*.pdf"))
+    pdf_files = list(settings.pdfs_normalised_path.glob("*.pdf"))
     if not pdf_files:
-        logger.info(f"no PDF files found in {settings.pdf_path}")
+        logger.info(f"no PDF files found in {settings.pdfs_normalised_path}")
         return
 
     logger.info(f"found {len(pdf_files)} PDF files for extraction")
 
-    settings.extracted_path.mkdir(parents=True, exist_ok=True)
+    settings.markdown_path.mkdir(parents=True, exist_ok=True)
 
     for pdf_file in pdf_files:
 
-        output_file = settings.extracted_path / f"{pdf_file.stem}.md"
+        output_file = settings.markdown_path / f"{pdf_file.stem}.md"
 
         if output_file.exists():
             logger.info(f"skipping {pdf_file.name} (already extracted)")

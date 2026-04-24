@@ -2,19 +2,19 @@
 
 from pathlib import Path
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Ollama connection
-    ollama_host: str = "http://ollama-rag:11434"
+    ollama_host: str = "http://ollama:11434"
 
     # Ollama models
     embedding_model: str = "mxbai-embed-large"
     llm_model: str = "llama3.1:8b"
 
     # Data paths
-    data_path: Path = Path("/srv/shadowrun-rag")
+    data_path: Path = Path("/data")
 
     # Chunking settings
     chunk_size: int = 1000
@@ -29,19 +29,17 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-    )
+    @property
+    def pdfs_raw_path(self) -> Path:
+        return self.data_path / "pdfs_raw"
 
     @property
-    def pdf_path(self) -> Path:
-        return self.data_path / "pdfs"
+    def pdfs_normalised_path(self) -> Path:
+        return self.data_path / "pdfs_normalised"
 
     @property
-    def extracted_path(self) -> Path:
-        return self.data_path / "extracted"
+    def markdown_path(self) -> Path:
+        return self.data_path / "markdown"
 
     @property
     def chroma_path(self) -> Path:

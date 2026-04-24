@@ -15,17 +15,10 @@ Two Docker containers running on homelab hardware with NVIDIA GPU access:
 - **shadowrun-rag**: Python 3.12 application (uv for dependency management)
 - **ollama-rag**: Ollama server for LLM inference and embeddings
 
-Data stored on host at `/srv/shadowrun-rag/` and mounted into containers:
-
-- `pdfs/` - source rulebook PDFs
-- `extracted/` - markdown output from marker-pdf
-- `chroma_db/` - ChromaDB vector database (file-based)
-- `model_cache/` - marker-pdf model cache
-
 ```
-PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
-                                                         ↓
-                           query → retrieve → Ollama LLM → answer
+pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown/ → chunks → embeddings → ChromaDB
+                                                                                              ↓
+                                                          query → retrieve → Ollama LLM → answer
 ```
 
 | Component      | Choice                                    |
@@ -41,79 +34,58 @@ PDFs → marker-pdf → markdown → chunks → embeddings → ChromaDB
 
 Deployment is managed via the `personal-homelab` repo. The `compose.yaml` for this service lives there.
 
-1. Set up `.env` file on the `development machine`
-2. Set up necessary dir structure on the `remote machine`
+1. Set up `.env` file on the development machine
+2. Set up necessary dir structure on the remote machine
 
 ```sh
-/srv/ollama/        # mount point for ollama
-/srv/shadowrun-rag/ # mount point for shadowrun-rag
-├── pdfs/           # Source PDFs (read-only)
-├── extracted/      # Markdown output from marker-pdf
-└── chroma_db/      # Vector database
+/srv/ollama/                  # mount point for ollama
+/srv/shadowrun-rag/
+├── pdfs_raw/                 # drop raw PDFs here (upload via filebrowser)
+├── pdfs_normalised/          # normalised copies, read by extraction pipeline
+├── markdown/                 # markdown output from marker-pdf
+├── chroma_db/                # ChromaDB vector database
+└── model_cache/              # marker-pdf model cache
 ```
 
 ```sh
 # On the remote machine
 sudo mkdir -p /srv/ollama
-sudo mkdir -p /srv/shadowrun-rag/{pdfs,extracted,chroma_db,model_cache}
-sudo chown -R $SHDWRN_REMOTE_USER :$SHDWRN_REMOTE_USER /srv/shadowrun-rag
-# place the pdfs into /srv/shadowrun-rag/pdfs
+sudo mkdir -p /srv/shadowrun-rag/{pdfs_raw,pdfs_normalised,markdown,chroma_db,model_cache}
+sudo chown -R $SHDWRN_REMOTE_USER:$SHDWRN_REMOTE_USER /srv/shadowrun-rag
 ```
 
 3. Deploy via `personal-homelab` repo (builds image and starts containers)
 
-4. Run the following scripts from the `development machine`
+4. Pull Ollama models
 
 ```sh
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama ollama pull mxbai-embed-large
 ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec ollama ollama pull llama3.1:8b
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/create_embeddings.py
-# Or run this if you are running the containers locally
-# docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py
-# This will:
-# - Convert PDFs to markdown using marker-pdf
-# - Chunk the markdown into ~1000 char pieces
-# - Generate embeddings and store in ChromaDB
-
-# Also while it is running worth verifying if the GPU is being used
-ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST nvidia-smi
-+-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
-+-----------------------------------------+------------------------+----------------------+
-| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
-| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
-|                                         |                        |               MIG M. |
-|=========================================+========================+======================|
-|   0  NVIDIA GeForce RTX 3060        Off |   00000000:01:00.0 Off |                  N/A |
-|  0%   40C    P2             36W /  170W |    3453MiB /  12288MiB |      0%      Default |
-|                                         |                        |                  N/A |
-+-----------------------------------------+------------------------+----------------------+
-
-+-----------------------------------------------------------------------------------------+
-| Processes:                                                                              |
-|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
-|        ID   ID                                                               Usage      |
-|=========================================================================================|
-|    0   N/A  N/A           17892      C   /app/.venv/bin/python3                 3444MiB |
-+-----------------------------------------------------------------------------------------+
 ```
 
-6. Once the PDFs have been analyzed have fun
+5. Upload PDFs via filebrowser into `pdfs_raw/`, then run the pipeline
 
 ```sh
-docker exec -it shadowrun-rag uv run python src/query.py "What is Tir Tairngire"
-docker exec -it shadowrun-rag uv run python src/query.py "How does magic work?" --sources
+mise run normalise   # copy PDFs from pdfs_raw/ to pdfs_normalised/ with normalised filenames
+mise run convert     # convert PDFs to markdown
+mise run embed       # create embeddings and store in ChromaDB
+```
+
+6. Query
+
+```sh
+mise run query -- "What is Tir Tairngire"
+mise run query -- "How does magic work?"
 ```
 
 ## Container Configuration
 
 | Variable          | Description                  | Required | Default                   |
 | ----------------- | ---------------------------- | -------- | ------------------------- |
-| `OLLAMA_HOST`     | Ollama API URL               | No       | `http://ollama-rag:11434` |
+| `OLLAMA_HOST`     | Ollama API URL               | No       | `http://ollama:11434`     |
 | `EMBEDDING_MODEL` | Ollama model for embeddings  | No       | `mxbai-embed-large`       |
 | `LLM_MODEL`       | Ollama model for answers     | No       | `llama3.1:8b`             |
-| `DATA_PATH`       | Base path for data files     | No       | `/srv/shadowrun-rag`      |
+| `DATA_PATH`       | Base path for data files     | No       | `/data`                   |
 | `CHUNK_SIZE`      | Text chunk size (characters) | No       | `1000`                    |
 | `CHUNK_OVERLAP`   | Overlap between chunks       | No       | `200`                     |
 | `TOP_K`           | Number of chunks to retrieve | No       | `5`                       |

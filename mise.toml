@@ -24,3 +24,19 @@ run = [{ task = "build" }, { task = "push" }]
 [tasks.validate]
 description = "Build and push image to local homelab registry"
 run = "curl --silent $REGISTRY_HOST/v2/homelab/shadowrun-rag/tags/list"
+
+[tasks.normalise]
+description = "Normalise PDF filenames from pdfs_raw/ to pdfs_normalised/"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/normalise_pdf_filenames.py"
+
+[tasks.convert]
+description = "Convert normalised PDFs to markdown"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/convert_pdfs_to_markdown.py"
+
+[tasks.embed]
+description = "Create embeddings from markdown files"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec shadowrun-rag uv run python src/create_embeddings.py"
+
+[tasks.query]
+description = "Query the RAG system — pass your question as an argument e.g. mise run query -- 'What is Tir Tairngire'"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -it shadowrun-rag uv run python src/query.py \"${@}\""

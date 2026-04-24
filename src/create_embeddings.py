@@ -14,16 +14,16 @@ from logs import logger, setup_logging
 
 def load_and_chunk_documents():
     """Load markdown files and chunk them."""
-    logger.info(f"loading documents from {settings.extracted_path}")
+    logger.info(f"loading documents from {settings.markdown_path}")
 
-    if not settings.extracted_path.exists() or not list(
-        settings.extracted_path.glob("*.md")
+    if not settings.markdown_path.exists() or not list(
+        settings.markdown_path.glob("*.md")
     ):
-        logger.info(f"no markdown files found in {settings.extracted_path}")
+        logger.info(f"no markdown files found in {settings.markdown_path}")
         return []
 
     loader = DirectoryLoader(
-        str(settings.extracted_path),
+        str(settings.markdown_path),
         glob="*.md",
         loader_cls=TextLoader,
         loader_kwargs={"encoding": "utf-8"},

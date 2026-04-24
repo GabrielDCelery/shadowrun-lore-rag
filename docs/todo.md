@@ -2,7 +2,7 @@
 
 ## In Progress
 
-- [ ] Commit pending changes (docs restructure, Dockerfile user setup, mise tasks, compose.yaml removal)
+- [x] Commit pending changes (docs restructure, Dockerfile user setup, mise tasks, compose.yaml removal)
 
 ## Up Next
 
