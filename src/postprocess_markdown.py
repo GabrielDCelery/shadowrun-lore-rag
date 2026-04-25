@@ -8,12 +8,16 @@ Cleans:
 - Malformed table rows (cells containing only punctuation/whitespace)
 - OCR hallucinations (a phrase repeated 5+ times on a single line)
 - Consecutive blank lines (collapsed to single blank line)
+- Markdown normalisation via mdformat (collapses excessive table cell whitespace
+  that marker-pdf inserts to match PDF column widths)
 
 Usage:
     uv run python src/postprocess_markdown.py
 """
 
 import re
+
+import mdformat
 
 from config import settings
 from logs import logger, setup_logging
@@ -29,6 +33,12 @@ NAV_BAR_RE = re.compile(r"(?:[A-Z]{3,}\s+){2,}Page\s+\d+.*")
 
 # Malformed table row: all cells contain only punctuation/whitespace
 MALFORMED_TABLE_RE = re.compile(r"^\|[\s,\.;:!\?|]+\|$")
+
+# Matches a table row (starts and ends with |)
+TABLE_ROW_RE = re.compile(r"^\|.*\|$")
+
+# Matches runs of 2+ spaces within a table cell
+CELL_WHITESPACE_RE = re.compile(r"  +")
 
 # OCR hallucination: a non-whitespace phrase of 10+ chars repeated 5+ times on a single line
 REPEATED_PHRASE_RE = re.compile(r"(\S.{9,})\1{5,}")
@@ -52,6 +62,19 @@ def is_malformed_table_row(line: str) -> bool:
     return bool(MALFORMED_TABLE_RE.match(line))
 
 
+def collapse_table_cell_whitespace(line: str) -> str:
+    """Collapse runs of spaces within table cells to a single space.
+
+    Must run before mdformat — extremely wide cells (marker-pdf pads to PDF
+    column widths) cause mdformat to misparse the table and merge all rows
+    into one line. Separator rows (|---|---|) also need collapsing for the
+    same reason; their exact dash count is irrelevant to markdown rendering.
+    """
+    if not TABLE_ROW_RE.match(line):
+        return line
+    return CELL_WHITESPACE_RE.sub(" ", line)
+
+
 def postprocess(content: str) -> str:
     lines = content.splitlines()
     output = []
@@ -69,6 +92,7 @@ def postprocess(content: str) -> str:
         #     if not line:
         #         continue
 
+        line = collapse_table_cell_whitespace(line)
         line = clean_nav_bar(line)
 
         # Collapse consecutive blank lines
@@ -79,7 +103,9 @@ def postprocess(content: str) -> str:
         output.append(line)
         prev_blank = is_blank
 
-    return "\n".join(output)
+    result = "\n".join(output)
+    result = mdformat.text(result, extensions={"gfm"}, options={"wrap": "no", "compact_tables": True})
+    return result
 
 
 def main() -> None:

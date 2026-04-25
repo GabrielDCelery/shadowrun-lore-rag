@@ -79,11 +79,10 @@ def query(question: str, show_sources: bool = False):
     logger.debug(f"question: {question}\n")
     logger.debug("generating answer...\n")
 
-    answer = rag_chain.invoke(question)
-
-    print("Answer:")
-    print("")
-    print(answer)
+    print("Answer:\n")
+    for chunk in rag_chain.stream(question):
+        print(chunk, end="", flush=True)
+    print()
 
     if show_sources:
         docs = retriever.invoke(question)

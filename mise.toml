@@ -44,6 +44,13 @@ run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag 
 description = "Watch GPU utilisation in real time"
 run = "ssh -t $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST watch -n 2 nvidia-smi"
 
+[tasks."debug:pull-markdown"]
+description = "Pull processed markdown files from the homelab"
+run = """
+scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_clean/*.md" ./data/markdown_clean/
+scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_extracted/*.md" ./data/markdown_extracted/
+"""
+
 [tasks."run:query"]
 description = "Query the RAG system — pass your question as an argument e.g. mise run run:query -- 'What is Tir Tairngire'"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/query.py \"${@}\""

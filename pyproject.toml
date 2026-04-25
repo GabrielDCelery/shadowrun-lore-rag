@@ -12,4 +12,6 @@ dependencies = [
     "langchain-chroma>=0.1.0",
     "chromadb>=0.5.0",
     "langchain-text-splitters>=0.3.0",
+    "mdformat>=1.0.0",
+    "mdformat-gfm>=1.0.0",
 ]
