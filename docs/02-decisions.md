@@ -17,6 +17,7 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 | D12 | Pipeline stages             | Separate directory per stage, no in-place edits  |
 | D13 | Markdown post-processing    | Strip OCR noise, normalise with mdformat         |
 | D14 | ToC/credits/index stripping | Detect and remove front/back matter              |
+| D15 | Evaluation approach         | Two-pass: generate answers, then judge separately |
 
 **Infrastructure**
 
@@ -213,6 +214,62 @@ Denver has a `# CONTENTS` heading at line 7890 (77% through the document) which 
 
 **Known gaps — germany and neo-anarchists:**
 Both books have ToC tables at the start but no heading above them to anchor detection on. The safety valve passes them through unchanged. The unstripped ToC tables are modest noise (~30 lines each) and do not justify adding fragile heuristics to detect headingless tables.
+
+---
+
+### D15: Evaluation approach (`evaluate.py`)
+
+**Decision:** Two-pass evaluation. Pass 1 generates RAG answers and saves them to a timestamped JSON file. Pass 2 runs a separate LLM judge against those answers and saves scores to a second timestamped file.
+
+**Context:** Need a repeatable way to measure retrieval quality across pipeline changes (chunk size, top-k, prompt tuning, re-embedding). Manual inspection alone doesn't scale; a single-pass approach loses the ability to re-judge without re-querying.
+
+**Two scoring dimensions:**
+- **Correctness** — did the answer contain the right facts? Scored against the expected key facts in `tests/rag_queries.md`.
+- **Groundedness** — did the answer come from the retrieved chunks or from the model's training data? Shadowrun lore exists in LLM training data (wikis, forums) so a model could answer correctly without using the RAG at all. Low groundedness means the pipeline is not contributing.
+
+**Two-model setup:**
+- `llm_model` (e.g. `llama3.1:8b`) generates answers
+- `judge_model` (e.g. `mistral`) scores them
+- Both configured separately in `config.py`; both run via Ollama
+- Using a different model for judging avoids self-scoring bias (models tend to rate their own answers generously)
+- Models run sequentially so no extra VRAM required
+
+**Output files:**
+- `evals/answers_<timestamp>.json` — question, retrieved chunks, generated answer
+- `evals/scores_<timestamp>.json` — per-question correctness/groundedness scores with reasoning; references answer file by name
+
+**Why two passes:**
+- Answers can be inspected manually before judging — useful for catching obvious failures (wrong book retrieved, mid-sentence chunks, hallucinations) that a numeric score might not surface
+- Judge can be re-run with different models or criteria without re-querying the RAG
+- Historical answer files can be re-judged after scoring criteria change
+- If judge pass crashes, answers are not lost
+
+**Alternatives considered:**
+
+- Single pass (answer + judge in one script) — simpler but loses ability to re-judge; chosen against
+- Human-only evaluation — no numeric baseline, can't track improvement across runs; ruled out
+- External evaluation framework (RAGAS etc.) — adds dependency, less control over judge prompt; ruled out
+
+**Evaluation runs (2026-04-25) — `llama3.1:8b` answers, `mistral:7b-instruct` judge, `top_k=7`, Tir Tairngire only:**
+
+Three runs were made while tuning the judge prompt. v1 used a loose rubric; v2 tightened to fact-count based scoring with explicit per-fact deduction and "must be explicitly stated, not implied"; v3 accepted 0 as a valid score (previously the model returned 0 despite a floor of 1 in the prompt).
+
+| Q | Category | v1 correctness | v2 correctness | v3 correctness | v3 groundedness | Root cause |
+| --- | --- | --- | --- | --- | --- | --- |
+| Q1 — population & racial composition | factual | 3 | 0 | 0 | 3 | Retrieval miss — demographic stats chunk not in top 7 |
+| Q2 — Rite of Progression | factual | 4 | 4 | 4 | 5 | Missing results/appeal timing detail (not in retrieved chunks) |
+| Q3 — automatic weapon penalties | factual | 3 | 4 | 4 | 5 | Garbled table row conversion — column headers split mid-word by OCR |
+| Q4 — Portland economy decline | inference | 5 | 4 | 4 | 5 | "Council decision is the cause" implied not explicitly stated |
+| Q5 — Ehran/Bright Water identity | inference | 4 | 4 | 4 | 5 | Missing Bright Water terminal cancer detail (not in retrieved chunks) |
+| **Avg** | | **3.8** | **3.2** | **3.2** | **4.6** | |
+
+**Findings:**
+- Scores stabilised at v2/v3 — fact-count rubric produces consistent results across runs
+- Q1 groundedness dropped to 3 in v3: model guessed "elves are probably dominant" which isn't in the retrieved chunks; stricter "must be explicitly stated" rule penalised this correctly
+- Q1 is a pure retrieval miss; the demographic stats chunk was not in the top 7 retrieved. Increasing `top_k` may help but is unconfirmed
+- Q3 correct chunk was retrieved (ranked 4th) but OCR splits column headers mid-word in weapon penalty tables, producing garbled row-as-sentence output the model cannot parse. Data quality issue, not a retrieval problem
+- Inference questions perform on par with factual ones under the stricter rubric (both averaging 4) — the gap closes because "implied not stated" deductions hit inference questions too
+- Groundedness averaging 4.6 (5.0 excluding Q1) — model is working from retrieved chunks, not training data
 
 ---
 

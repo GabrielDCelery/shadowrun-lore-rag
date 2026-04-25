@@ -29,8 +29,9 @@ COPY --chown=${USERNAME}:${USERNAME} pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/home/${USERNAME}/.cache/uv,uid=${USER_UID},gid=${USER_GID} \
     uv sync --frozen
 
-# Copy source code
+# Copy source code and tests
 COPY --chown=${USERNAME}:${USERNAME} src/ ./src/
+COPY --chown=${USERNAME}:${USERNAME} tests/ ./tests/
 
 # Set Python path
 ENV PYTHONPATH=/app/src

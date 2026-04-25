@@ -52,10 +52,25 @@ run = "ssh -t $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST watch -n 2 nvidia-smi"
 description = "Query the RAG system — pass your question as an argument e.g. mise run debug:query -- 'What is Tir Tairngire'"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/query.py \"${@}\""
 
+[tasks."debug:evaluate-pass1"]
+description = "Generate RAG answers for all test queries (pass 1) — saves to /data/evals/ on remote"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/evaluate.py --pass1 tests/rag_queries.md"
+
+[tasks."debug:evaluate-pass2"]
+description = "Judge saved answers with LLM judge (pass 2)"
+usage = 'arg "<filename>" help="Answers filename from pass 1 e.g. 20260425_193000_answers.json"'
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/evaluate.py --pass2 /data/evals/${usage_filename}"
+
 [tasks."debug:pull-markdown"]
 description = "Pull processed markdown files from the homelab"
 run = """
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_clean/*.md" ./data/markdown_clean/
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_extracted/*.md" ./data/markdown_extracted/
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_stripped/*.md" ./data/markdown_stripped/
+"""
+
+[tasks."debug:pull-evals"]
+description = "Pull evaluation results (answers + scores) from the homelab"
+run = """
+scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/evals/." ./data/evals/
 """

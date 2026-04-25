@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Ollama models
     embedding_model: str = "mxbai-embed-large"
     llm_model: str = "llama3.1:8b"
+    judge_model: str = "mistral:7b-instruct"
 
     # Data paths
     data_path: Path = Path("/data")
@@ -52,6 +53,10 @@ class Settings(BaseSettings):
     @property
     def chroma_path(self) -> Path:
         return self.data_path / "chroma_db"
+
+    @property
+    def evals_path(self) -> Path:
+        return self.data_path / "evals"
 
 
 settings = Settings()
