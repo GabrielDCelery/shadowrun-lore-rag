@@ -5,7 +5,7 @@ A RAG system for querying Shadowrun RPG rulebooks using natural language. Runs o
 ## Architecture
 
 ```
-pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown_extracted/ → postprocess → markdown_clean/ → chunks → embeddings → ChromaDB
+pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown_extracted/ → clean → markdown_clean/ → strip_toc → markdown_stripped/ → chunks → embeddings → ChromaDB
                                                                                               ↓
                                                           query → retrieve → Ollama LLM → answer
 ```
@@ -16,6 +16,8 @@ pdfs_raw/ → normalise → pdfs_normalised/ → marker-pdf → markdown_extract
 | ------------------------------------- | ------------------------------------------------ |
 | `src/normalise_pdf_filenames.py`      | Copy PDFs from pdfs_raw/ to pdfs_normalised/ with normalised names |
 | `src/convert_pdfs_to_markdown.py`     | Convert PDFs to markdown using marker-pdf        |
+| `src/clean_markdown.py`              | Fix OCR artifacts, normalise table whitespace    |
+| `src/strip_toc.py`                   | Remove ToC/Credits/Index sections                |
 | `src/create_embeddings.py`            | Chunk markdown, create embeddings, store in DB   |
 | `src/query.py`                        | CLI interface to ask questions                   |
 | `src/config.py`                       | Pydantic settings (paths, models, tuning)        |

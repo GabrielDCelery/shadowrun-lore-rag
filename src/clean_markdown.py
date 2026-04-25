@@ -1,6 +1,6 @@
-"""Post-process extracted markdown files before embedding.
+"""Clean extracted markdown files before embedding.
 
-Reads from markdown_extracted/, writes cleaned files to markdown/.
+Reads from markdown_extracted/, writes cleaned files to markdown_clean/.
 
 Cleans:
 - Image reference lines (![](...))
@@ -12,7 +12,7 @@ Cleans:
   that marker-pdf inserts to match PDF column widths)
 
 Usage:
-    uv run python src/postprocess_markdown.py
+    uv run python src/clean_markdown.py
 """
 
 import re

@@ -24,25 +24,33 @@ run = [{ task = "image:build" }, { task = "image:push" }]
 description = "Check image exists in local homelab registry"
 run = "curl --silent $REGISTRY_HOST/v2/homelab/shadowrun-rag/tags/list"
 
-[tasks."run:normalise"]
+[tasks."pipeline:1-normalise"]
 description = "Normalise PDF filenames from pdfs_raw/ to pdfs_normalised/"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/normalise_pdf_filenames.py"
 
-[tasks."run:convert"]
+[tasks."pipeline:2-convert"]
 description = "Convert normalised PDFs to markdown"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/convert_pdfs_to_markdown.py"
 
-[tasks."run:postprocess"]
-description = "Post-process extracted markdown files before embedding"
-run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/postprocess_markdown.py"
+[tasks."pipeline:3-clean"]
+description = "Clean extracted markdown files (fix OCR artifacts, normalise tables)"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/clean_markdown.py"
 
-[tasks."run:embed"]
+[tasks."pipeline:4-strip-toc"]
+description = "Strip table of contents, credits and index sections from cleaned markdown"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/strip_toc.py"
+
+[tasks."pipeline:5-embed"]
 description = "Create embeddings from markdown files"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/create_embeddings.py"
 
-[tasks."run:gpu-watch"]
+[tasks."debug:gpu-watch"]
 description = "Watch GPU utilisation in real time"
 run = "ssh -t $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST watch -n 2 nvidia-smi"
+
+[tasks."debug:query"]
+description = "Query the RAG system — pass your question as an argument e.g. mise run debug:query -- 'What is Tir Tairngire'"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/query.py \"${@}\""
 
 [tasks."debug:pull-markdown"]
 description = "Pull processed markdown files from the homelab"
@@ -50,7 +58,3 @@ run = """
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_clean/*.md" ./data/markdown_clean/
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_extracted/*.md" ./data/markdown_extracted/
 """
-
-[tasks."run:query"]
-description = "Query the RAG system — pass your question as an argument e.g. mise run run:query -- 'What is Tir Tairngire'"
-run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/query.py \"${@}\""
