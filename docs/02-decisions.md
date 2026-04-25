@@ -6,17 +6,17 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 
 **RAG Pipeline**
 
-| #   | Question               | Decision                                         |
-| --- | ---------------------- | ------------------------------------------------ |
-| D1  | RAG stack              | LangChain + ChromaDB                             |
-| D2  | Embedding model        | mxbai-embed-large via Ollama                     |
-| D3  | PDF extraction tool    | marker-pdf (surya OCR)                           |
-| D4  | Table chunking         | Table-aware chunking                             |
-| D5  | Table embedding format | Row-as-sentence natural language conversion      |
-| D6  | Comparative queries    | DuckDB parallel store (planned, not implemented) |
-| D12 | Pipeline stages        | Separate directory per stage, no in-place edits |
-| D13 | Markdown post-processing | Strip OCR noise, normalise with mdformat       |
-| D14 | ToC/credits/index stripping | Detect and remove front/back matter         |
+| #   | Question                    | Decision                                         |
+| --- | --------------------------- | ------------------------------------------------ |
+| D1  | RAG stack                   | LangChain + ChromaDB                             |
+| D2  | Embedding model             | mxbai-embed-large via Ollama                     |
+| D3  | PDF extraction tool         | marker-pdf (surya OCR)                           |
+| D4  | Table chunking              | Table-aware chunking                             |
+| D5  | Table embedding format      | Row-as-sentence natural language conversion      |
+| D6  | Comparative queries         | DuckDB parallel store (planned, not implemented) |
+| D12 | Pipeline stages             | Separate directory per stage, no in-place edits  |
+| D13 | Markdown post-processing    | Strip OCR noise, normalise with mdformat         |
+| D14 | ToC/credits/index stripping | Detect and remove front/back matter              |
 
 **Infrastructure**
 
@@ -176,9 +176,10 @@ pdfs_raw/ → pdfs_normalised/ → markdown_extracted/ → markdown_clean/ → m
 **Context:** Initial test queries returned ToC entries instead of actual content — the embedding model matched query terms to chapter titles in the ToC rather than the relevant body text. Index sections (alphabetical term lists with page numbers) produce similarly low-quality matches.
 
 **Detection approach:**
-- Front matter: find first heading matching `TABLE OF CONTENTS` or `CREDITS/CONTENTS`, then scan forward for the first heading followed within 20 lines by a non-table prose line of 80+ characters — that heading marks where real content starts.
+
+- Front matter: find first heading matching `TABLE OF CONTENTS`, `CREDITS/CONTENTS`, or standalone `CONTENTS` (within first 15% of document only — see false positive note below). Scan forward for the first heading followed within 20 lines by a non-table prose line of 80+ characters — that heading marks where real content starts.
 - Back matter: find a standalone `INDEX` heading in the last 30% of the document, strip from there to end of file.
-- Safety valve: if content start cannot be detected, the file is passed through unchanged.
+- Safety valve: if content start cannot be detected, the file is passed through unchanged rather than destroying content.
 
 **Alternatives considered:**
 
@@ -186,7 +187,32 @@ pdfs_raw/ → pdfs_normalised/ → markdown_extracted/ → markdown_clean/ → m
 - Fixed line-count skip — brittle, each book has different front matter length; ruled out
 - Manual per-book config — accurate but not scalable; ruled out
 
-**Why:** ToC noise directly degrades retrieval quality. The detection approach is robust enough across 8 books with different formatting styles (some combine ToC and credits, some have the ToC mid-document after an opening story).
+**Why:** ToC noise directly degrades retrieval quality. The detection approach is robust enough across the corpus with different formatting styles (some combine ToC and credits, some have the ToC mid-document after an opening story).
+
+**Per-book findings (corpus as of 2026-04-25):**
+
+Heading patterns vary across books — discovered empirically by inspecting the markdown files.
+
+| File                  | ToC heading                  | Front | Back | Notes                                   |
+| --------------------- | ---------------------------- | ----- | ---- | --------------------------------------- |
+| year-of-the-comet     | `## TABLE OF CONTENTS`       | 101   | 153  | Credits inline in ToC table             |
+| sprawl-survival-guide | `## TABLE OF CONTENTS`       | 65    | —    |                                         |
+| state-of-the-art-2064 | `# TABLE OF CONTENTS`        | 62    | —    |                                         |
+| bug-city              | `# CREDITS/CONTENTS`         | 138   | —    | Two consecutive headings; both consumed |
+| tir-tairngire         | `## TABLE OF CONTENTS`       | 174   | —    | Opening story before ToC is preserved   |
+| tir-na-nog            | `# TABLE OF CONTENTS`        | 198   | —    |                                         |
+| aztlán                | `## CONTENTS`                | 218   | —    | Early-only match required (see below)   |
+| core rules            | `# ... TABLE OF CONTENTS...` | 195   | —    | Opening story preserved                 |
+| denver                | —                            | —     | 2729 | Index stripped; no ToC heading          |
+| germany               | —                            | —     | —    | ToC table present but no heading anchor |
+| neo-anarchists        | —                            | —     | —    | Credits then ToC, no heading anchor     |
+| bullets-bandages      | —                            | —     | —    | No ToC; short supplement                |
+
+**Known false positive — denver `# CONTENTS`:**
+Denver has a `# CONTENTS` heading at line 7890 (77% through the document) which is an in-book section, not the table of contents. Matching standalone `CONTENTS` headings anywhere in the document would incorrectly strip 2200+ lines of real content. Fixed by restricting the `CONTENTS` pattern to the first 15% of lines only.
+
+**Known gaps — germany and neo-anarchists:**
+Both books have ToC tables at the start but no heading above them to anchor detection on. The safety valve passes them through unchanged. The unstripped ToC tables are modest noise (~30 lines each) and do not justify adding fragile heuristics to detect headingless tables.
 
 ---
 

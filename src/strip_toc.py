@@ -21,9 +21,18 @@ import re
 from config import settings
 from logs import logger, setup_logging
 
-# Headings that mark the start of a ToC/credits block
+# Unambiguous ToC/credits headings — safe to match anywhere in the document
 TOC_HEADING_RE = re.compile(
-    r"^#+\s+.*\bTABLE\s+OF\s+CONTENTS\b.*$|^#+\s+CREDITS(/CONTENTS)?\s*$",
+    r"^#+\s+.*\bTABLE\s+OF\s+CONTENTS\b.*$"
+    r"|^#+\s+CREDITS(/CONTENTS)?\s*$",
+    re.IGNORECASE,
+)
+
+# Ambiguous ToC headings — only match within the first 15% of the document
+# to avoid matching in-document sections with the same name (e.g. denver has
+# "# CONTENTS" at line 7890 which is a chapter section, not the ToC)
+TOC_HEADING_EARLY_RE = re.compile(
+    r"^#+\s+CONTENTS\s*$",
     re.IGNORECASE,
 )
 
@@ -38,9 +47,18 @@ TABLE_ROW_RE = re.compile(r"^\|")
 
 
 def find_toc_start(lines: list[str]) -> int | None:
-    """Return the line index of the first ToC/credits heading, or None."""
+    """Return the line index of the first ToC/credits heading, or None.
+
+    Unambiguous patterns (TABLE OF CONTENTS, CREDITS/CONTENTS) are matched
+    anywhere. Ambiguous standalone CONTENTS headings are only matched within
+    the first 15% of the document to avoid false positives mid-document.
+    """
+    early_limit = max(50, int(len(lines) * 0.15))
     for i, line in enumerate(lines):
-        if TOC_HEADING_RE.match(line.rstrip()):
+        stripped = line.rstrip()
+        if TOC_HEADING_RE.match(stripped):
+            return i
+        if i < early_limit and TOC_HEADING_EARLY_RE.match(stripped):
             return i
     return None
 
