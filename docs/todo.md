@@ -10,10 +10,19 @@
 - [x] marker-pdf quality — enabled `drop_repeated_text` and `disable_ocr_math`
 - [x] Markdown post-processing script — strips image references, navigation headers, malformed table rows
 - [x] Table handling — D4 (table-aware chunking) and D5 (row-as-sentence conversion) implemented in `chunk_documents.py`
+- [x] Initial test queries run — identified retrieval issues (ToC noise, garbled headings, semantic gap between query phrasing and source terminology)
 
 ## Up Next
 
-- [ ] Test queries — verify retrieval quality for prose, table, and comparative questions after embedding
+- [ ] Implement `strip_toc.py` — detect and remove ToC/Credits/Index sections from `markdown_clean/` → `markdown_stripped/`
+- [ ] Update `create_embeddings.py` to read from `markdown_stripped/` instead of `markdown_clean/`
+- [ ] Add `markdown_stripped/` path to `config.py`
+- [ ] Add `pipeline:4-strip-toc` debug pull to `debug:pull-markdown` mise task
+- [ ] Re-embed clean corpus after ToC removal
+- [ ] Generate test set — use Claude Code to read cleaned markdowns and produce `tests/rag_queries.md` with questions + expected answers covering rules, characters, lore, and in-character content
+- [ ] Build evaluation script `src/evaluate.py` — runs test set through RAG, scores each answer via LLM-as-judge (Ollama locally, swappable to Claude Haiku via config)
+- [ ] Add `debug:evaluate` mise task
+- [ ] Run baseline evaluation score after clean corpus is embedded
 
 ## Known Markdown Extraction Issues (potential future fixes)
 
