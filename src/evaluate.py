@@ -41,8 +41,8 @@ def parse_queries(path: Path) -> list[dict]:
 
     # Match book sections: ## Book Name (`file-slug`)
     book_re = re.compile(r"^## .+\(`([^`]+)`\)", re.MULTILINE)
-    # Match question blocks: ### Q<n> — <category>
-    question_re = re.compile(r"^### (Q\d+) — (\w+)", re.MULTILINE)
+    # Match question blocks: ### Q<n> or XQ<n> — <category>
+    question_re = re.compile(r"^### (X?Q\d+) — ([\w-]+)", re.MULTILINE)
 
     # Split into book sections
     book_positions = [(m.start(), m.group(1)) for m in book_re.finditer(text)]
@@ -61,7 +61,7 @@ def parse_queries(path: Path) -> list[dict]:
             block = book_text[q_start:q_end]
 
             question = _extract_field(block, r"\*\*Q:\*\* (.+)")
-            source = _extract_field(block, r"\*\*Source:\*\* (.+)")
+            source = _extract_field(block, r"\*\*Sources?:\*\* (.+)")
             expected = _extract_list(block)
 
             if not question:
