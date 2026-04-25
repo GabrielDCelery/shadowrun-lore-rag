@@ -104,7 +104,9 @@ def postprocess(content: str) -> str:
         prev_blank = is_blank
 
     result = "\n".join(output)
-    result = mdformat.text(result, extensions={"gfm"}, options={"wrap": "no", "compact_tables": True})
+    result = mdformat.text(
+        result, extensions={"gfm"}, options={"wrap": "no", "compact_tables": True}
+    )
     return result
 
 
