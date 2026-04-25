@@ -57,4 +57,5 @@ description = "Pull processed markdown files from the homelab"
 run = """
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_clean/*.md" ./data/markdown_clean/
 scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_extracted/*.md" ./data/markdown_extracted/
+scp -r "$SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST:/srv/shadowrun-rag/markdown_stripped/*.md" ./data/markdown_stripped/
 """

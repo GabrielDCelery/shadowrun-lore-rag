@@ -14,10 +14,10 @@
 
 ## Up Next
 
-- [ ] Implement `strip_toc.py` — detect and remove ToC/Credits/Index sections from `markdown_clean/` → `markdown_stripped/`
-- [ ] Update `create_embeddings.py` to read from `markdown_stripped/` instead of `markdown_clean/`
-- [ ] Add `markdown_stripped/` path to `config.py`
-- [ ] Add `pipeline:4-strip-toc` debug pull to `debug:pull-markdown` mise task
+- [x] Implement `strip_toc.py` — detect and remove ToC/Credits/Index sections from `markdown_clean/` → `markdown_stripped/`
+- [x] Update `create_embeddings.py` to read from `markdown_stripped/` instead of `markdown_clean/`
+- [x] Add `markdown_stripped/` path to `config.py`
+- [x] Add `pipeline:4-strip-toc` debug pull to `debug:pull-markdown` mise task
 - [ ] Re-embed clean corpus after ToC removal
 - [ ] Generate test set — use Claude Code to read cleaned markdowns and produce `tests/rag_queries.md` with questions + expected answers covering rules, characters, lore, and in-character content
 - [ ] Build evaluation script `src/evaluate.py` — runs test set through RAG, scores each answer via LLM-as-judge (Ollama locally, swappable to Claude Haiku via config)

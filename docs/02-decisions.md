@@ -11,9 +11,12 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 | D1  | RAG stack              | LangChain + ChromaDB                             |
 | D2  | Embedding model        | mxbai-embed-large via Ollama                     |
 | D3  | PDF extraction tool    | marker-pdf (surya OCR)                           |
-| D4  | Table chunking         | Table-aware chunking (planned, not implemented)  |
+| D4  | Table chunking         | Table-aware chunking                             |
 | D5  | Table embedding format | Row-as-sentence natural language conversion      |
 | D6  | Comparative queries    | DuckDB parallel store (planned, not implemented) |
+| D12 | Pipeline stages        | Separate directory per stage, no in-place edits |
+| D13 | Markdown post-processing | Strip OCR noise, normalise with mdformat       |
+| D14 | ToC/credits/index stripping | Detect and remove front/back matter         |
 
 **Infrastructure**
 
@@ -64,9 +67,9 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 
 ### D3: PDF extraction tool
 
-**Decision:** marker-pdf with GPU acceleration. Image extraction must NOT be disabled.
+**Decision:** marker-pdf with GPU acceleration. `drop_repeated_text` and `disable_ocr_math` are enabled. Image extraction must NOT be disabled.
 
-**Context:** Shadowrun sourcebooks are scanned PDFs of mixed quality. Some have callout boxes and styled sidebars that marker-pdf may detect as image regions but contain rules text — disabling image extraction risks silent content loss.
+**Context:** Shadowrun sourcebooks are scanned PDFs of mixed quality. Some have callout boxes and styled sidebars that marker-pdf may detect as image regions but contain rules text — disabling image extraction risks silent content loss. Repeated text (headers/footers stamped on every page) and OCR-hallucinated math symbols are consistent noise in these books.
 
 **Alternatives considered:**
 
@@ -91,8 +94,6 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 - MarkdownTextSplitter (current) — fast but breaks tables mid-row; ruled out
 
 **Why:** A mid-table chunk with no headers cannot be matched by an embedding model to any meaningful query. A 2000-character table is better as one chunk than two broken halves.
-
-**Open:** Not yet implemented.
 
 ---
 
@@ -129,6 +130,63 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 **Why DuckDB:** In-process, no extra container, queryable directly from Python. `llama3.1:8b` can generate basic SQL from natural language.
 
 **Open:** Not yet implemented. Implement only after table chunking and row conversion are validated.
+
+---
+
+### D12: Multi-stage pipeline directories
+
+**Decision:** Each pipeline step writes to its own directory. No step modifies files in place.
+
+```
+pdfs_raw/ → pdfs_normalised/ → markdown_extracted/ → markdown_clean/ → markdown_stripped/
+```
+
+**Context:** marker-pdf is slow (minutes per book). Post-processing steps iterate frequently. Keeping stages separate means any step can be re-run without redoing earlier expensive work.
+
+**Alternatives considered:**
+
+- Separate directory per stage — independently inspectable, re-runnable from any point; chosen
+- In-place transformation — simpler but destroys intermediate state; ruled out
+- Single output directory with suffixed filenames — cluttered, no clean glob per stage; ruled out
+
+**Why:** Being able to inspect `markdown_clean/` independently of `markdown_stripped/` is essential for debugging OCR quality and tuning post-processing rules.
+
+---
+
+### D13: Markdown post-processing (`clean_markdown.py`)
+
+**Decision:** After marker-pdf extraction, run a cleaning pass that strips image references, navigation bar lines, malformed table rows, and collapses consecutive blank lines. Then normalise table whitespace with `mdformat`.
+
+**Context:** marker-pdf consistently produces the same noise patterns across Shadowrun sourcebooks: `![]()` image lines, emoji-based nav bars, table rows with only punctuation, and table cells padded to PDF column widths with runs of spaces. `mdformat` with GFM extension normalises the result.
+
+**Alternatives considered:**
+
+- Dedicated cleaning script + mdformat — catches all known noise patterns; chosen
+- Skip cleaning, rely on chunker to ignore noise — noise ends up embedded, hurts retrieval; ruled out
+- Manual review per book — not scalable; ruled out
+
+**Why:** Consistent noise patterns across the corpus make rule-based cleaning effective. mdformat table normalisation is necessary because marker-pdf pads cells to PDF column widths, which causes mdformat to misparse extremely wide tables if not pre-collapsed.
+
+---
+
+### D14: ToC/credits/index stripping (`strip_toc.py`)
+
+**Decision:** Before embedding, strip front matter (table of contents, publisher credits) and back matter (index) from cleaned markdown. Reads from `markdown_clean/`, writes to `markdown_stripped/`.
+
+**Context:** Initial test queries returned ToC entries instead of actual content — the embedding model matched query terms to chapter titles in the ToC rather than the relevant body text. Index sections (alphabetical term lists with page numbers) produce similarly low-quality matches.
+
+**Detection approach:**
+- Front matter: find first heading matching `TABLE OF CONTENTS` or `CREDITS/CONTENTS`, then scan forward for the first heading followed within 20 lines by a non-table prose line of 80+ characters — that heading marks where real content starts.
+- Back matter: find a standalone `INDEX` heading in the last 30% of the document, strip from there to end of file.
+- Safety valve: if content start cannot be detected, the file is passed through unchanged.
+
+**Alternatives considered:**
+
+- Heuristic heading + prose detection — handles varied formatting across books; chosen
+- Fixed line-count skip — brittle, each book has different front matter length; ruled out
+- Manual per-book config — accurate but not scalable; ruled out
+
+**Why:** ToC noise directly degrades retrieval quality. The detection approach is robust enough across 8 books with different formatting styles (some combine ToC and credits, some have the ToC mid-document after an opening story).
 
 ---
 

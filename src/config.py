@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         return self.data_path / "markdown_clean"
 
     @property
+    def markdown_stripped_path(self) -> Path:
+        return self.data_path / "markdown_stripped"
+
+    @property
     def chroma_path(self) -> Path:
         return self.data_path / "chroma_db"
 

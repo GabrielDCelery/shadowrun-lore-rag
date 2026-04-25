@@ -13,10 +13,10 @@ from logs import logger, setup_logging
 
 def load_and_chunk_documents():
     """Load markdown files and chunk them using two-pass table-aware chunker."""
-    logger.info(f"loading documents from {settings.markdown_path}")
+    logger.info(f"loading documents from {settings.markdown_stripped_path}")
 
-    md_files = list(settings.markdown_path.glob("*.md"))
-    if not settings.markdown_path.exists() or not md_files:
+    md_files = list(settings.markdown_stripped_path.glob("*.md"))
+    if not settings.markdown_stripped_path.exists() or not md_files:
         logger.info(f"no markdown files found in {settings.markdown_path}")
         return []
 
