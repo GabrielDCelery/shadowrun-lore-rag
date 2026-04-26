@@ -6,17 +6,17 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 
 **RAG Pipeline**
 
-| #   | Question                    | Decision                                         |
-| --- | --------------------------- | ------------------------------------------------ |
-| D1  | RAG stack                   | LangChain + ChromaDB                             |
-| D2  | Embedding model             | mxbai-embed-large via Ollama                     |
-| D3  | PDF extraction tool         | marker-pdf (surya OCR)                           |
-| D4  | Table chunking              | Table-aware chunking                             |
-| D5  | Table embedding format      | Row-as-sentence natural language conversion      |
-| D6  | Comparative queries         | DuckDB parallel store (planned, not implemented) |
-| D12 | Pipeline stages             | Separate directory per stage, no in-place edits  |
-| D13 | Markdown post-processing    | Strip OCR noise, normalise with mdformat         |
-| D14 | ToC/credits/index stripping | Detect and remove front/back matter              |
+| #   | Question                    | Decision                                          |
+| --- | --------------------------- | ------------------------------------------------- |
+| D1  | RAG stack                   | LangChain + ChromaDB                              |
+| D2  | Embedding model             | mxbai-embed-large via Ollama                      |
+| D3  | PDF extraction tool         | marker-pdf (surya OCR)                            |
+| D4  | Table chunking              | Table-aware chunking                              |
+| D5  | Table embedding format      | Row-as-sentence natural language conversion       |
+| D6  | Comparative queries         | DuckDB parallel store (planned, not implemented)  |
+| D12 | Pipeline stages             | Separate directory per stage, no in-place edits   |
+| D13 | Markdown post-processing    | Strip OCR noise, normalise with mdformat          |
+| D14 | ToC/credits/index stripping | Detect and remove front/back matter               |
 | D15 | Evaluation approach         | Two-pass: generate answers, then judge separately |
 
 **Infrastructure**
@@ -168,6 +168,24 @@ pdfs_raw/ → pdfs_normalised/ → markdown_extracted/ → markdown_clean/ → m
 
 **Why:** Consistent noise patterns across the corpus make rule-based cleaning effective. mdformat table normalisation is necessary because marker-pdf pads cells to PDF column widths, which causes mdformat to misparse extremely wide tables if not pre-collapsed.
 
+**Known gap — OCR-split table headers (identified 2026-04-26):**
+
+Evaluation run on the full corpus revealed that table-based queries score significantly lower (0–2) than prose queries (4–5). Root cause: OCR splits multi-word column headers across lines, producing garbled cells (empty strings, fragments starting with `/` or `:`). The row-as-sentence conversion in `chunk_documents.py` then emits sentences with missing or broken labels (e.g. `": 22,000¥/1 yr"` instead of `"Possession: 22,000¥/1 yr"`).
+
+Affected queries in baseline eval: Q3 (weapon penalties, Tir Tairngire), Q6 (airfares, Tir na nÓg), Q18 (life expectancy, Germany), Q19 (airfares/imports, Germany), Q31 (travel costs, Sprawl Survival Guide), Q33 (Big Ten HQs, Core Rules).
+
+**Planned fix — two-step approach (decided 2026-04-26):**
+
+Step 1 (free, try first): Add heuristic header repair to `clean_markdown.py`. If a header cell is empty, starts with `/`, `:`, or a common continuation word (`and`, `or`, `of`), merge it into the previous header cell. This fixes the most common OCR split pattern without re-running the expensive PDF conversion. Re-clean, re-strip, re-embed, and re-eval to measure impact.
+
+Step 2 (fallback, if Step 1 insufficient): Re-run `pipeline:2-convert` with `--use_llm` enabled on the 5 affected books only (Tir Tairngire, Tir na nÓg, Germany, Sprawl Survival Guide, Core Rules). marker-pdf's `--use_llm` flag activates LLM-assisted table post-processing that can merge split headers at extraction time; it supports Ollama so no additional infrastructure is needed. Conversion will be slower but only 5 books need re-processing.
+
+No existing library handles the semantic split-header case — the community consensus is to fix at extraction time rather than post-processing. The heuristic approach is worth trying first since it may be sufficient and avoids the cost of re-conversion.
+
+**Current capability assessment (2026-04-26):**
+
+Prose-based queries work well. Inference queries (combining multiple facts from prose) and factual prose queries both score 4–5 consistently across the full corpus. The RAG is reliable for lore questions, political/social context, character and faction information, and rules concepts. It only falls down on exact stat/price/penalty lookups from tables — a specific data quality problem, not a fundamental retrieval issue.
+
 ---
 
 ### D14: ToC/credits/index stripping (`strip_toc.py`)
@@ -224,10 +242,12 @@ Both books have ToC tables at the start but no heading above them to anchor dete
 **Context:** Need a repeatable way to measure retrieval quality across pipeline changes (chunk size, top-k, prompt tuning, re-embedding). Manual inspection alone doesn't scale; a single-pass approach loses the ability to re-judge without re-querying.
 
 **Two scoring dimensions:**
+
 - **Correctness** — did the answer contain the right facts? Scored against the expected key facts in `tests/rag_queries.md`.
 - **Groundedness** — did the answer come from the retrieved chunks or from the model's training data? Shadowrun lore exists in LLM training data (wikis, forums) so a model could answer correctly without using the RAG at all. Low groundedness means the pipeline is not contributing.
 
 **Two-model setup:**
+
 - `llm_model` (e.g. `llama3.1:8b`) generates answers
 - `judge_model` (e.g. `mistral`) scores them
 - Both configured separately in `config.py`; both run via Ollama
@@ -235,10 +255,12 @@ Both books have ToC tables at the start but no heading above them to anchor dete
 - Models run sequentially so no extra VRAM required
 
 **Output files:**
+
 - `evals/answers_<timestamp>.json` — question, retrieved chunks, generated answer
 - `evals/scores_<timestamp>.json` — per-question correctness/groundedness scores with reasoning; references answer file by name
 
 **Why two passes:**
+
 - Answers can be inspected manually before judging — useful for catching obvious failures (wrong book retrieved, mid-sentence chunks, hallucinations) that a numeric score might not surface
 - Judge can be re-run with different models or criteria without re-querying the RAG
 - Historical answer files can be re-judged after scoring criteria change
@@ -254,16 +276,17 @@ Both books have ToC tables at the start but no heading above them to anchor dete
 
 Three runs were made while tuning the judge prompt. v1 used a loose rubric; v2 tightened to fact-count based scoring with explicit per-fact deduction and "must be explicitly stated, not implied"; v3 accepted 0 as a valid score (previously the model returned 0 despite a floor of 1 in the prompt).
 
-| Q | Category | v1 correctness | v2 correctness | v3 correctness | v3 groundedness | Root cause |
-| --- | --- | --- | --- | --- | --- | --- |
-| Q1 — population & racial composition | factual | 3 | 0 | 0 | 3 | Retrieval miss — demographic stats chunk not in top 7 |
-| Q2 — Rite of Progression | factual | 4 | 4 | 4 | 5 | Missing results/appeal timing detail (not in retrieved chunks) |
-| Q3 — automatic weapon penalties | factual | 3 | 4 | 4 | 5 | Garbled table row conversion — column headers split mid-word by OCR |
-| Q4 — Portland economy decline | inference | 5 | 4 | 4 | 5 | "Council decision is the cause" implied not explicitly stated |
-| Q5 — Ehran/Bright Water identity | inference | 4 | 4 | 4 | 5 | Missing Bright Water terminal cancer detail (not in retrieved chunks) |
-| **Avg** | | **3.8** | **3.2** | **3.2** | **4.6** | |
+| Q                                    | Category  | v1 correctness | v2 correctness | v3 correctness | v3 groundedness | Root cause                                                            |
+| ------------------------------------ | --------- | -------------- | -------------- | -------------- | --------------- | --------------------------------------------------------------------- |
+| Q1 — population & racial composition | factual   | 3              | 0              | 0              | 3               | Retrieval miss — demographic stats chunk not in top 7                 |
+| Q2 — Rite of Progression             | factual   | 4              | 4              | 4              | 5               | Missing results/appeal timing detail (not in retrieved chunks)        |
+| Q3 — automatic weapon penalties      | factual   | 3              | 4              | 4              | 5               | Garbled table row conversion — column headers split mid-word by OCR   |
+| Q4 — Portland economy decline        | inference | 5              | 4              | 4              | 5               | "Council decision is the cause" implied not explicitly stated         |
+| Q5 — Ehran/Bright Water identity     | inference | 4              | 4              | 4              | 5               | Missing Bright Water terminal cancer detail (not in retrieved chunks) |
+| **Avg**                              |           | **3.8**        | **3.2**        | **3.2**        | **4.6**         |                                                                       |
 
 **Findings:**
+
 - Scores stabilised at v2/v3 — fact-count rubric produces consistent results across runs
 - Q1 groundedness dropped to 3 in v3: model guessed "elves are probably dominant" which isn't in the retrieved chunks; stricter "must be explicitly stated" rule penalised this correctly
 - Q1 is a pure retrieval miss; the demographic stats chunk was not in the top 7 retrieved. Increasing `top_k` may help but is unconfirmed

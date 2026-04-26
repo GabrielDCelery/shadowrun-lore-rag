@@ -18,11 +18,11 @@
 - [x] Update `create_embeddings.py` to read from `markdown_stripped/` instead of `markdown_clean/`
 - [x] Add `markdown_stripped/` path to `config.py`
 - [x] Add `pipeline:4-strip-toc` debug pull to `debug:pull-markdown` mise task
-- [ ] Re-embed clean corpus after ToC removal
+- [x] Re-embed clean corpus after ToC removal
+- [x] Run baseline evaluation score after clean corpus is embedded — same results as pre-ToC-strip baseline
 - [ ] Generate test set — use Claude Code to read cleaned markdowns and produce `tests/rag_queries.md` with questions + expected answers covering rules, characters, lore, and in-character content
 - [ ] Build evaluation script `src/evaluate.py` — runs test set through RAG, scores each answer via LLM-as-judge (Ollama locally, swappable to Claude Haiku via config)
 - [ ] Add `debug:evaluate` mise task
-- [ ] Run baseline evaluation score after clean corpus is embedded
 
 ## Known Markdown Extraction Issues (potential future fixes)
 
