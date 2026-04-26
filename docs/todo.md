@@ -48,4 +48,6 @@
 
 ## Future
 
+- [ ] Expose query as a FastAPI endpoint in `shadowrun-rag` (wraps current `query.py` logic)
+- [ ] Chainlit chat UI as a separate container in `personal-homelab` repo — calls the RAG API
 - [ ] Claude Code session sync — sync `~/.claude/projects/` across machines to preserve conversation history
