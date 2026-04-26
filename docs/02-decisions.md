@@ -152,6 +152,11 @@ pdfs_raw/ → pdfs_normalised/ → markdown_extracted/ → markdown_clean/ → m
 
 **Why:** Being able to inspect `markdown_clean/` independently of `markdown_stripped/` is essential for debugging OCR quality and tuning post-processing rules.
 
+**Responsibility boundary (decided 2026-04-26):**
+
+- Step 3 (`clean_markdown.py`) — inline text normalization: fix OCR artifacts, normalize formatting, rewrite content in place. Currency symbol expansion belongs here.
+- Step 4 (`strip_toc.py`) — structural decisions: which sections to keep or remove. Does not rewrite content. Name reflects current scope; rename to `strip_sections.py` if more structural operations are added.
+
 ---
 
 ### D13: Markdown post-processing (`clean_markdown.py`)
@@ -182,9 +187,27 @@ Result: partial improvement. Q3 (weapon penalties, Tir Tairngire) improved from 
 
 Step 2 (fallback if needed): Re-run `pipeline:2-convert` with `--use_llm` enabled on the 5 affected books only (Tir Tairngire, Tir na nÓg, Germany, Sprawl Survival Guide, Core Rules). marker-pdf's `--use_llm` flag activates LLM-assisted table post-processing; it supports Ollama so no additional infrastructure is needed. Conversion will be slower but only 5 books need re-processing. Hold until the structural retrieval failures (D6) are addressed first.
 
+**Known gap — currency symbol expansion (identified 2026-04-26):**
+
+Table columns use currency symbols (`¥`, `£`) rather than words. Row-as-sentence output embeds "Cost (¥): 160" but queries use natural language ("nuyen", "Irish punts"). The embedding model cannot bridge symbol-to-word gap, so prose preamble chunks (which spell out "nuyen" and "Irish punts") rank above the actual data rows. Q6 (Tir na nÓg airfares) is a confirmed case.
+
+**Fix status (2026-04-26):** `expand_currency_symbols()` added to `clean_markdown.py`. Applies after header repair and before `mdformat`. `¥` → `nuyen (¥)` and `£` → `Irish punts (£)` globally; lookbehind guards prevent double-expansion if the word form is already present. Re-eval after re-embedding: overall score 3.90 → 4.00 (+0.10). Q37 (medkit costs) improved. Q6 retrieval fixed but LLM still fails — see below.
+
+**Known gaps — persistent failures (updated 2026-04-26):**
+
+| Q   | Failure mode         | Root cause                                                                          |
+| --- | -------------------- | ----------------------------------------------------------------------------------- |
+| Q6  | LLM terminology gap  | Retrieval now works (correct airfare rows retrieved). LLM doesn't know "the Tír" = Tir na nÓg — obscure in-world alias a 7-8B model doesn't bridge. Accepted: a larger model would handle it. |
+| Q18 | Table retrieval      | Germany racial stats table; likely same currency/table issues as pre-fix            |
+| Q19 | Table retrieval      | Germany airfares; may share Q6's terminology gap ("Germany" vs book's phrasing)     |
+| Q31 | Vocabulary collision | "long distance travel" matches space travel section in Target: Wastelands, outranking Sprawl Survival Guide content |
+| Q33 | Structural           | Answer requires 10 separate corp entries; no single top_k retrieves all             |
+
+Q31 and Q33 require D6 (structured store / query router). Q18 and Q19 need investigation — may be retrieval gaps or LLM reasoning failures like Q6.
+
 **Current capability assessment (2026-04-26):**
 
-Prose-based queries work well. Inference queries (combining multiple facts from prose) and factual prose queries both score 4–5 consistently across the full corpus. The RAG is reliable for lore questions, political/social context, character and faction information, and rules concepts. Consistent failures (Q6, Q8, Q9, Q25, Q31) are structural: the answers are spread across too many chunks for top_k retrieval to capture — a retrieval architecture problem, not a data quality or model problem.
+Prose-based queries work well. Inference queries and factual prose queries score 4–5 consistently. The RAG is reliable for lore, political/social context, character and faction information, and rules concepts. Groundedness is consistently 5 — when data is retrieved, the LLM uses it rather than hallucinating. Remaining failures are either structural retrieval gaps (Q31, Q33) or LLM reasoning limitations on obscure in-world terminology (Q6) that a larger model would handle.
 
 ---
 

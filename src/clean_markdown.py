@@ -11,6 +11,8 @@ Cleans:
 - OCR-split table headers: empty cells and continuation fragments (/word, :word,
   'and/or/of word') in header rows are merged into the previous cell so that
   row-as-sentence conversion produces labelled sentences instead of ': value'
+- Currency symbol expansion: ¥ → nuyen (¥), £ → Irish punts (£) so that queries
+  using either the symbol or the word form match the same chunks
 - Markdown normalisation via mdformat (collapses excessive table cell whitespace
   that marker-pdf inserts to match PDF column widths)
 
@@ -52,6 +54,16 @@ SEPARATOR_ROW_RE = re.compile(r"^\|[\s\-:|]+\|$")
 # Continuation fragments that should be merged into the previous header cell
 _CONTINUATION_STARTS = ("/", ":")
 _CONTINUATION_WORDS = ("and ", "or ", "of ")
+
+# Currency symbol expansion — embed both symbol and word form so queries using
+# either "nuyen" or "¥" / "Irish punts" or "£" match the same chunks.
+# Two patterns per symbol: one for when preceded by a word char (digit/letter)
+# needing a space inserted, and one for other contexts (inside parens, etc.).
+# Lookbehind guards prevent double-expansion when the word form is already present.
+_YEN_WORD_RE = re.compile(r"(\w)(?<!nuyen \()¥")
+_YEN_NONWORD_RE = re.compile(r"(?<!\w)(?<!nuyen \()¥")
+_POUND_WORD_RE = re.compile(r"(\w)(?<!punts \()£")
+_POUND_NONWORD_RE = re.compile(r"(?<!\w)(?<!punts \()£")
 
 
 def is_image_line(line: str) -> bool:
@@ -138,6 +150,21 @@ def repair_table_headers(content: str) -> str:
     return "\n".join(result)
 
 
+def expand_currency_symbols(content: str) -> str:
+    """Expand currency symbols to include the word form.
+
+    Table column headers use ¥ and £ but queries use "nuyen" and "Irish punts".
+    Embedding "nuyen (¥)" makes both query forms match the same chunk.
+    The lookbehind guards prevent double-expansion if the text already contains
+    the expanded form (e.g. "nuyen (¥)" → unchanged on a second pass).
+    """
+    content = _YEN_WORD_RE.sub(r"\1 nuyen (¥)", content)
+    content = _YEN_NONWORD_RE.sub("nuyen (¥)", content)
+    content = _POUND_WORD_RE.sub(r"\1 Irish punts (£)", content)
+    content = _POUND_NONWORD_RE.sub("Irish punts (£)", content)
+    return content
+
+
 def postprocess(content: str) -> str:
     lines = content.splitlines()
     output = []
@@ -168,6 +195,7 @@ def postprocess(content: str) -> str:
 
     result = "\n".join(output)
     result = repair_table_headers(result)
+    result = expand_currency_symbols(result)
     result = mdformat.text(
         result, extensions={"gfm"}, options={"wrap": "no", "compact_tables": True}
     )

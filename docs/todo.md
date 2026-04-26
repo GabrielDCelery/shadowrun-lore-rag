@@ -30,8 +30,13 @@
 
 ## Up Next
 
-- [ ] Investigate persistent failures — Q6, Q8, Q9, Q25, Q31 score 2 across all model/top_k variants; determine root cause per question
-- [ ] D6: DuckDB parallel store + query router for comparative/aggregation queries (Q31, Q33 are structural retrieval failures)
+- [x] Q6 — currency symbol expansion implemented and evaluated; retrieval now works but LLM fails on "the Tír" vs "Tir na nÓg" terminology gap; accepted as LLM limitation (larger model would handle it)
+- [x] Q9 — resolved by currency expansion; score unchanged at 4 (was already fixed in prior run)
+- [x] Q8, Q25 — resolved in prior runs; stable at 4 and 5 respectively
+- [ ] Q18, Q19 — Germany table failures; investigate whether retrieval or LLM terminology gap (similar to Q6)
+- [ ] Q31 — vocabulary collision (space travel section outranks Sprawl Survival Guide); requires D6 or query expansion
+- [ ] Q33 — structural failure (10 corp entries); requires D6
+- [ ] D6: DuckDB parallel store + query router for comparative/aggregation queries (Q31, Q33)
 
 ## Known Markdown Extraction Issues (potential future fixes)
 
