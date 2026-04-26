@@ -48,6 +48,13 @@
 
 ## Future
 
-- [ ] Expose query as a FastAPI endpoint in `shadowrun-rag` (wraps current `query.py` logic)
+- [ ] Expose query as a FastAPI endpoint in `shadowrun-rag` (wraps current `query.py` logic); change Dockerfile CMD to start the server automatically
+- [ ] Add conversation memory — in-memory per session using LangChain `create_history_aware_retriever` to rewrite follow-up queries before retrieval (handles "tell me more about that" type questions); history lost on container restart which is acceptable
 - [ ] Chainlit chat UI as a separate container in `personal-homelab` repo — calls the RAG API
+- [ ] Shadowtalk conversation generator — multi-turn, multi-persona conversation engine:
+  - Silent observer agent (the user) retrieves seed lore via RAG from a topic/question
+  - 2-3 fixed character personas (handle, faction, personality, speech quirks) react to the seed
+  - Each character queries the shared ChromaDB with their perspective prepended to the query — same vector store, different retrieval per character
+  - 4-6 turns total, cuts off mid-thought like rulebook shadowtalk
+  - Separate script/endpoint from query.py
 - [ ] Claude Code session sync — sync `~/.claude/projects/` across machines to preserve conversation history
