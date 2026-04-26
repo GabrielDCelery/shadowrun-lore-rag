@@ -182,7 +182,19 @@ def pass1(queries_path: Path) -> None:
     settings.evals_path.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = settings.evals_path / f"{timestamp}_answers.json"
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    output = {
+        "metadata": {
+            "timestamp": timestamp,
+            "queries_file": str(queries_path),
+            "llm_model": settings.llm_model,
+            "embedding_model": settings.embedding_model,
+            "top_k": settings.top_k,
+            "chunk_size": settings.chunk_size,
+            "chunk_overlap": settings.chunk_overlap,
+        },
+        "results": results,
+    }
+    output_path.write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
 
     logger.info(f"answers saved to {output_path}")
     print(output_path.name)
@@ -235,7 +247,14 @@ Respond with JSON only, no explanation outside the JSON:
 def pass2(answers_path: Path) -> None:
     logger.info(f"pass 2 — judging answers from {answers_path}")
 
-    answers = json.loads(answers_path.read_text(encoding="utf-8"))
+    raw = json.loads(answers_path.read_text(encoding="utf-8"))
+    # Support both old format (flat list) and new format ({metadata, results})
+    if isinstance(raw, list):
+        answers_metadata = {}
+        answers = raw
+    else:
+        answers_metadata = raw.get("metadata", {})
+        answers = raw.get("results", [])
     logger.info(f"loaded {len(answers)} answers")
 
     judge_llm = ChatOllama(
@@ -293,7 +312,18 @@ def pass2(answers_path: Path) -> None:
     settings.evals_path.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = settings.evals_path / f"{timestamp}_scores.json"
-    output_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+    output = {
+        "metadata": {
+            "timestamp": timestamp,
+            "judge_model": settings.judge_model,
+            "answers": {
+                "file": answers_path.name,
+                **answers_metadata,
+            },
+        },
+        "results": scores,
+    }
+    output_path.write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
 
     logger.info(f"scores saved to {output_path}")
 

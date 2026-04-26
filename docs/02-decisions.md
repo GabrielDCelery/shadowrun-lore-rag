@@ -174,17 +174,17 @@ Evaluation run on the full corpus revealed that table-based queries score signif
 
 Affected queries in baseline eval: Q3 (weapon penalties, Tir Tairngire), Q6 (airfares, Tir na nÓg), Q18 (life expectancy, Germany), Q19 (airfares/imports, Germany), Q31 (travel costs, Sprawl Survival Guide), Q33 (Big Ten HQs, Core Rules).
 
-**Planned fix — two-step approach (decided 2026-04-26):**
+**Fix status (2026-04-26):**
 
-Step 1 (free, try first): Add heuristic header repair to `clean_markdown.py`. If a header cell is empty, starts with `/`, `:`, or a common continuation word (`and`, `or`, `of`), merge it into the previous header cell. This fixes the most common OCR split pattern without re-running the expensive PDF conversion. Re-clean, re-strip, re-embed, and re-eval to measure impact.
+Step 1 implemented: heuristic header repair added to `clean_markdown.py`. If a header cell is empty, starts with `/`, `:`, or a common continuation word (`and`, `or`, `of`), it is merged into the previous header cell. Re-embedded the full corpus after the fix.
 
-Step 2 (fallback, if Step 1 insufficient): Re-run `pipeline:2-convert` with `--use_llm` enabled on the 5 affected books only (Tir Tairngire, Tir na nÓg, Germany, Sprawl Survival Guide, Core Rules). marker-pdf's `--use_llm` flag activates LLM-assisted table post-processing that can merge split headers at extraction time; it supports Ollama so no additional infrastructure is needed. Conversion will be slower but only 5 books need re-processing.
+Result: partial improvement. Q3 (weapon penalties, Tir Tairngire) improved from 4→5 after the fix. Q6, Q8, Q9, Q25, Q31 remain consistently failing (score 2) across all top_k and model variants tested — these are structural retrieval gaps (data spread across too many chunks) not header quality issues.
 
-No existing library handles the semantic split-header case — the community consensus is to fix at extraction time rather than post-processing. The heuristic approach is worth trying first since it may be sufficient and avoids the cost of re-conversion.
+Step 2 (fallback if needed): Re-run `pipeline:2-convert` with `--use_llm` enabled on the 5 affected books only (Tir Tairngire, Tir na nÓg, Germany, Sprawl Survival Guide, Core Rules). marker-pdf's `--use_llm` flag activates LLM-assisted table post-processing; it supports Ollama so no additional infrastructure is needed. Conversion will be slower but only 5 books need re-processing. Hold until the structural retrieval failures (D6) are addressed first.
 
 **Current capability assessment (2026-04-26):**
 
-Prose-based queries work well. Inference queries (combining multiple facts from prose) and factual prose queries both score 4–5 consistently across the full corpus. The RAG is reliable for lore questions, political/social context, character and faction information, and rules concepts. It only falls down on exact stat/price/penalty lookups from tables — a specific data quality problem, not a fundamental retrieval issue.
+Prose-based queries work well. Inference queries (combining multiple facts from prose) and factual prose queries both score 4–5 consistently across the full corpus. The RAG is reliable for lore questions, political/social context, character and faction information, and rules concepts. Consistent failures (Q6, Q8, Q9, Q25, Q31) are structural: the answers are spread across too many chunks for top_k retrieval to capture — a retrieval architecture problem, not a data quality or model problem.
 
 ---
 
@@ -276,23 +276,48 @@ Both books have ToC tables at the start but no heading above them to anchor dete
 
 Three runs were made while tuning the judge prompt. v1 used a loose rubric; v2 tightened to fact-count based scoring with explicit per-fact deduction and "must be explicitly stated, not implied"; v3 accepted 0 as a valid score (previously the model returned 0 despite a floor of 1 in the prompt).
 
-| Q                                    | Category  | v1 correctness | v2 correctness | v3 correctness | v3 groundedness | Root cause                                                            |
-| ------------------------------------ | --------- | -------------- | -------------- | -------------- | --------------- | --------------------------------------------------------------------- |
-| Q1 — population & racial composition | factual   | 3              | 0              | 0              | 3               | Retrieval miss — demographic stats chunk not in top 7                 |
-| Q2 — Rite of Progression             | factual   | 4              | 4              | 4              | 5               | Missing results/appeal timing detail (not in retrieved chunks)        |
-| Q3 — automatic weapon penalties      | factual   | 3              | 4              | 4              | 5               | Garbled table row conversion — column headers split mid-word by OCR   |
-| Q4 — Portland economy decline        | inference | 5              | 4              | 4              | 5               | "Council decision is the cause" implied not explicitly stated         |
-| Q5 — Ehran/Bright Water identity     | inference | 4              | 4              | 4              | 5               | Missing Bright Water terminal cancer detail (not in retrieved chunks) |
-| **Avg**                              |           | **3.8**        | **3.2**        | **3.2**        | **4.6**         |                                                                       |
+| Q                                    | Cat       | v1  | v2  | v3  | GND | Root cause                                          |
+| ------------------------------------ | --------- | --- | --- | --- | --- | --------------------------------------------------- |
+| Q1 — population & racial composition | factual   | 3   | 0   | 0   | 3   | Retrieval miss — stats chunk not in top 7           |
+| Q2 — Rite of Progression             | factual   | 4   | 4   | 4   | 5   | Missing results/appeal timing detail                |
+| Q3 — automatic weapon penalties      | factual   | 3   | 4   | 4   | 5   | OCR split header — garbled row-as-sentence output   |
+| Q4 — Portland economy decline        | inference | 5   | 4   | 4   | 5   | "Council decision is the cause" implied not stated  |
+| Q5 — Ehran/Bright Water identity     | inference | 4   | 4   | 4   | 5   | Missing Bright Water terminal cancer detail         |
+| **Avg**                              |           | 3.8 | 3.2 | 3.2 | 4.6 |                                                     |
 
-**Findings:**
+**Full corpus evaluation — top_k tuning (2026-04-26):**
 
-- Scores stabilised at v2/v3 — fact-count rubric produces consistent results across runs
-- Q1 groundedness dropped to 3 in v3: model guessed "elves are probably dominant" which isn't in the retrieved chunks; stricter "must be explicitly stated" rule penalised this correctly
-- Q1 is a pure retrieval miss; the demographic stats chunk was not in the top 7 retrieved. Increasing `top_k` may help but is unconfirmed
-- Q3 correct chunk was retrieved (ranked 4th) but OCR splits column headers mid-word in weapon penalty tables, producing garbled row-as-sentence output the model cannot parse. Data quality issue, not a retrieval problem
-- Inference questions perform on par with factual ones under the stricter rubric (both averaging 4) — the gap closes because "implied not stated" deductions hit inference questions too
-- Groundedness averaging 4.6 (5.0 excluding Q1) — model is working from retrieved chunks, not training data
+All runs: `llama3.1:8b` answers, `mistral:7b-instruct` judge, 41 questions across all books. Re-embedded after OCR header repair fix.
+
+| top_k | avg correctness | notes                                                  |
+| ----- | --------------- | ------------------------------------------------------ |
+| 5     | 3.95            | best score; LLM handles fewer chunks better            |
+| 7     | 3.90            | marginal drop; more context without much degradation   |
+| 9     | 3.80            | noticeable drop; "lost in the middle" effect starts    |
+| 12    | ~3.6            | further degradation; judge also returned out-of-range scores (32, 7) |
+| 20    | not tested      |                                                        |
+
+**Decision:** Use `top_k=7` as the baseline. Gains from k=5 are marginal (0.05) and k=7 provides a small buffer for harder questions. `llama3.1:8b` degrades noticeably above k=9 — small 7-8B models suffer from "lost in the middle": they struggle to synthesise information when too many retrieved chunks are present.
+
+**Structural retrieval failures (not fixed by top_k):** Q31 (travel costs, Sprawl Survival Guide) and Q33 (Big Ten HQs, Core Rules) score consistently low regardless of top_k. Root cause: Q31 answers are spread across 5+ prose sections; Q33 answers are in 10 separate corp entries. No single top_k value can retrieve all necessary chunks simultaneously. These require D6 (query router / structured store).
+
+**Model comparison (2026-04-26):**
+
+Ran fair cross-model comparison using a neutral judge (`llama3.1:8b` as judge for both, `top_k=7`):
+
+| Answer model       | Judge model        | Avg correctness | Notes                          |
+| ------------------ | ------------------ | --------------- | ------------------------------ |
+| mistral:7b-instruct | mistral:7b-instruct | 4.34           | Self-scoring bias — inflated   |
+| mistral:7b-instruct | llama3.1:8b        | 3.76            | Fair score                     |
+| llama3.1:8b         | llama3.1:8b        | 3.66            | Fair score                     |
+
+Self-scoring bias: 0.58 point inflation when a model judges its own outputs. Under fair comparison, mistral edges llama by only 0.10 points — effectively equivalent quality.
+
+**Decision:** Use `mistral:7b-instruct` as judge, `llama3.1:8b` as answer model (or either — quality is the same). The judge model should always differ from the answer model to avoid self-scoring bias. Judge prompt should enforce the 0-5 range strictly; out-of-range scores (e.g. 32, 7) have been observed at higher top_k values and should be capped.
+
+**Consistently failing questions (score 2 across all model and top_k variants):**
+
+Q6, Q8, Q9, Q25, Q31 — structural retrieval gaps. Root cause to be investigated before further model or top_k tuning.
 
 ---
 

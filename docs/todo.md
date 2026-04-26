@@ -20,16 +20,25 @@
 - [x] Add `pipeline:4-strip-toc` debug pull to `debug:pull-markdown` mise task
 - [x] Re-embed clean corpus after ToC removal
 - [x] Run baseline evaluation score after clean corpus is embedded — same results as pre-ToC-strip baseline
-- [ ] Generate test set — use Claude Code to read cleaned markdowns and produce `tests/rag_queries.md` with questions + expected answers covering rules, characters, lore, and in-character content
-- [ ] Build evaluation script `src/evaluate.py` — runs test set through RAG, scores each answer via LLM-as-judge (Ollama locally, swappable to Claude Haiku via config)
-- [ ] Add `debug:evaluate` mise task
+- [x] Generate test set — `tests/rag_queries.md` with 41 questions across all books (factual, inference, cross-book)
+- [x] Build evaluation script `src/evaluate.py` — two-pass: pass1 generates answers, pass2 judges with separate LLM
+- [x] Add `debug:evaluate` mise task
+- [x] Add metadata to eval output files (model, top_k, chunk settings in answers; judge model + answers ref in scores)
+- [x] OCR split table header repair — heuristic fix in `clean_markdown.py`; Q3 improved, persistent failures identified
+- [x] top_k tuning — tested k=5,7,9,12; settled on k=7 (k=5 marginal gain, k=9+ degrades)
+- [x] Model comparison — confirmed self-scoring bias (0.58pt inflation); mistral and llama3.1:8b equivalent under fair judge
+
+## Up Next
+
+- [ ] Investigate persistent failures — Q6, Q8, Q9, Q25, Q31 score 2 across all model/top_k variants; determine root cause per question
+- [ ] D6: DuckDB parallel store + query router for comparative/aggregation queries (Q31, Q33 are structural retrieval failures)
 
 ## Known Markdown Extraction Issues (potential future fixes)
 
 - [ ] Split headings — OCR breaks decorative capital letters into separate single-char headings (e.g. `# F` + `#### IRST IMPRESSIONS`). Hard to fix automatically.
 - [ ] Short line fragments — ~52 very short lines in Tir Tairngire, likely OCR fragments. Spot-check to assess impact.
+- [ ] marker-pdf `--use_llm` re-conversion — fallback for remaining OCR table issues on 5 affected books; hold until D6 addressed
 
 ## Future
 
-- [ ] D6: DuckDB parallel store + query router for comparative queries (implement after D4/D5 validated)
 - [ ] Claude Code session sync — sync `~/.claude/projects/` across machines to preserve conversation history

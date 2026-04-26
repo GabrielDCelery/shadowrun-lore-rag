@@ -8,6 +8,9 @@ Cleans:
 - Malformed table rows (cells containing only punctuation/whitespace)
 - OCR hallucinations (a phrase repeated 5+ times on a single line)
 - Consecutive blank lines (collapsed to single blank line)
+- OCR-split table headers: empty cells and continuation fragments (/word, :word,
+  'and/or/of word') in header rows are merged into the previous cell so that
+  row-as-sentence conversion produces labelled sentences instead of ': value'
 - Markdown normalisation via mdformat (collapses excessive table cell whitespace
   that marker-pdf inserts to match PDF column widths)
 
@@ -43,6 +46,13 @@ CELL_WHITESPACE_RE = re.compile(r"  +")
 # OCR hallucination: a non-whitespace phrase of 10+ chars repeated 5+ times on a single line
 REPEATED_PHRASE_RE = re.compile(r"(\S.{9,})\1{5,}")
 
+# Matches a markdown separator row: cells containing only dashes, colons, spaces
+SEPARATOR_ROW_RE = re.compile(r"^\|[\s\-:|]+\|$")
+
+# Continuation fragments that should be merged into the previous header cell
+_CONTINUATION_STARTS = ("/", ":")
+_CONTINUATION_WORDS = ("and ", "or ", "of ")
+
 
 def is_image_line(line: str) -> bool:
     return bool(IMAGE_RE.match(line))
@@ -75,6 +85,59 @@ def collapse_table_cell_whitespace(line: str) -> str:
     return CELL_WHITESPACE_RE.sub(" ", line)
 
 
+def _repair_header_row(line: str) -> str:
+    """Merge empty and continuation-fragment cells into the previous header cell.
+
+    OCR frequently splits a single multi-word column header across two adjacent
+    cells, e.g. 'Offense and Fine' + '/Imprisonment'.  Empty cells in the header
+    row leave the row-as-sentence converter with no label, producing output like
+    ': 22,000¥/1 yr' instead of 'Possession: 22,000¥/1 yr'.
+
+    Rules applied left-to-right:
+    - Empty cell          → copy the previous cell's text (propagate label)
+    - Cell starting with /  :  'and ' 'or ' 'of '
+                          → prepend previous cell text (merge continuation)
+    """
+    parts = line.split("|")
+    # parts[0] and parts[-1] are the text outside the outer pipes (empty for
+    # well-formed rows); parts[1:-1] are the actual cells.
+    cells = parts[1:-1]
+    repaired: list[str] = []
+    last_meaningful = ""
+
+    for cell in cells:
+        stripped = cell.strip()
+        if not stripped:
+            repaired.append(f" {last_meaningful} " if last_meaningful else cell)
+        elif stripped.startswith(_CONTINUATION_STARTS) or stripped.lower().startswith(
+            _CONTINUATION_WORDS
+        ):
+            merged = last_meaningful + stripped
+            repaired.append(f" {merged} ")
+            last_meaningful = merged
+        else:
+            last_meaningful = stripped
+            repaired.append(cell)
+
+    return "|" + "|".join(repaired) + "|"
+
+
+def repair_table_headers(content: str) -> str:
+    """Repair OCR-split header cells across all tables in the content."""
+    lines = content.splitlines()
+    result = []
+    for i, line in enumerate(lines):
+        if (
+            TABLE_ROW_RE.match(line)
+            and i + 1 < len(lines)
+            and SEPARATOR_ROW_RE.match(lines[i + 1])
+            and "--" in lines[i + 1]
+        ):
+            line = _repair_header_row(line)
+        result.append(line)
+    return "\n".join(result)
+
+
 def postprocess(content: str) -> str:
     lines = content.splitlines()
     output = []
@@ -104,6 +167,7 @@ def postprocess(content: str) -> str:
         prev_blank = is_blank
 
     result = "\n".join(output)
+    result = repair_table_headers(result)
     result = mdformat.text(
         result, extensions={"gfm"}, options={"wrap": "no", "compact_tables": True}
     )
