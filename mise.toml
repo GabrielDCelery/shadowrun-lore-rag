@@ -57,6 +57,10 @@ run = "ssh -t $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST watch -n 2 nvidia-smi"
 description = "Query the RAG system — pass your question as an argument e.g. mise run debug:query -- 'What is Tir Tairngire'"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/query.py \"${@}\""
 
+[tasks."debug:shadowtalk"]
+description = "Generate a Shadowrun-style shadowtalk conversation — e.g. mise run debug:shadowtalk -- 'Aztlan corporate security'"
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/shadowtalk.py \"${@}\""
+
 [tasks."debug:evaluate-pass1"]
 description = "Generate RAG answers for all test queries (pass 1) — saves to /data/evals/ on remote"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/evaluate.py --pass1 tests/rag_queries.md"

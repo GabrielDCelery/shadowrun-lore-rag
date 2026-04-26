@@ -12,3 +12,6 @@ def setup_logging(log_level: str = "INFO"):
         format="%(asctime)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Suppress noisy HTTP request logs from httpx (Ollama/Chroma API calls)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
