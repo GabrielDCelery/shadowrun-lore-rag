@@ -33,7 +33,9 @@
 - [x] Q6 — currency symbol expansion implemented and evaluated; retrieval now works but LLM fails on "the Tír" vs "Tir na nÓg" terminology gap; accepted as LLM limitation (larger model would handle it)
 - [x] Q9 — resolved by currency expansion; score unchanged at 4 (was already fixed in prior run)
 - [x] Q8, Q25 — resolved in prior runs; stable at 4 and 5 respectively
-- [ ] Q18, Q19 — Germany table failures; investigate whether retrieval or LLM terminology gap (similar to Q6)
+- [x] Q18 — judge error, not a pipeline failure; LLM answer was correct, judge misread it
+- [x] Q19 — root cause identified: airfare table landed under `### BY TRAIN` heading in extracted markdown due to PDF page boundary; `pipeline:2-convert-llm` added to re-convert with `qwen2.5vl:3b` via Ollama
+- [x] Q19 — LLM-assisted re-conversion attempted; fails with VRAM OOM (surya models hold 7GB, no headroom for vision LLM); accepted as known limitation alongside Q6
 - [ ] Q31 — vocabulary collision (space travel section outranks Sprawl Survival Guide); requires D6 or query expansion
 - [ ] Q33 — structural failure (10 corp entries); requires D6
 - [ ] D6: DuckDB parallel store + query router for comparative/aggregation queries (Q31, Q33)
@@ -42,7 +44,7 @@
 
 - [ ] Split headings — OCR breaks decorative capital letters into separate single-char headings (e.g. `# F` + `#### IRST IMPRESSIONS`). Hard to fix automatically.
 - [ ] Short line fragments — ~52 very short lines in Tir Tairngire, likely OCR fragments. Spot-check to assess impact.
-- [ ] marker-pdf `--use_llm` re-conversion — fallback for remaining OCR table issues on 5 affected books; hold until D6 addressed
+- [ ] marker-pdf `--use_llm` re-conversion — `pipeline:2-convert-llm` now supports this via `qwen2.5vl:3b`; Germany is the priority candidate; other affected books: Tir Tairngire, Tir na nÓg, Sprawl Survival Guide, Core Rules
 
 ## Future
 

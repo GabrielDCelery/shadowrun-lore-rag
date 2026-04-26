@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     embedding_model: str = "mxbai-embed-large"
     llm_model: str = "llama3.1:8b"
     judge_model: str = "mistral:7b-instruct"
+    marker_llm_model: str = "qwen2.5vl:3b"
 
     # Data paths
     data_path: Path = Path("/data")

@@ -32,6 +32,11 @@ run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag 
 description = "Convert normalised PDFs to markdown"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/convert_pdfs_to_markdown.py"
 
+[tasks."pipeline:2-convert-llm"]
+description = "Re-convert a specific book with LLM-assisted table fixing (qwen2.5-vl:3b via Ollama)"
+usage = 'arg "<book>" help="Book filename stem e.g. 7204---germany-sourcebook"'
+run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/convert_pdfs_to_markdown.py --use-llm --force --book ${usage_book}"
+
 [tasks."pipeline:3-clean"]
 description = "Clean extracted markdown files (fix OCR artifacts, normalise tables)"
 run = "ssh $SHDWRN_REMOTE_USER@$SHDWRN_REMOTE_HOST docker exec -t shadowrun-rag uv run python src/clean_markdown.py"

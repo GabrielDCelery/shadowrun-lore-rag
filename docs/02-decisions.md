@@ -68,7 +68,7 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 
 ### D3: PDF extraction tool
 
-**Decision:** marker-pdf with GPU acceleration. `drop_repeated_text` and `disable_ocr_math` are enabled. Image extraction must NOT be disabled.
+**Decision:** marker-pdf with GPU acceleration. `drop_repeated_text` and `disable_ocr_math` are enabled. Image extraction must NOT be disabled. LLM-assisted re-conversion is available via `pipeline:2-convert-llm <book>` using `qwen2.5vl:3b` via Ollama, but not viable on the current RTX 3060. Even after surya releases VRAM post-OCR, the two models together leave no headroom for compute buffers — Ollama loads weights into VRAM but falls back to CPU inference, maxing out all 4 cores at ~54s/table. Practical requirement is 16GB+ VRAM to run both models with compute buffers. To use `--use_llm` today: run marker-pdf on a higher-VRAM machine, or use the default Gemini Flash backend (pay-per-use, negligible cost for a handful of books).
 
 **Context:** Shadowrun sourcebooks are scanned PDFs of mixed quality. Some have callout boxes and styled sidebars that marker-pdf may detect as image regions but contain rules text — disabling image extraction risks silent content loss. Repeated text (headers/footers stamped on every page) and OCR-hallucinated math symbols are consistent noise in these books.
 
