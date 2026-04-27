@@ -8,6 +8,7 @@ Tables with clear headers and > MIN_TABLE_ROWS rows get row-as-sentence
 conversion. Small or headerless tables are kept as a single atomic chunk.
 """
 
+import hashlib
 import re
 from typing import Generator
 
@@ -98,6 +99,10 @@ def _split_sections(
     yield from flush_prose()
 
 
+def _chunk_id(content: str) -> str:
+    return hashlib.sha1(content.encode()).hexdigest()
+
+
 def chunk_markdown(
     content: str,
     source: str,
@@ -114,6 +119,8 @@ def chunk_markdown(
                 [section_content],
                 metadatas=[{"source": source, "type": "prose", "heading": heading}],
             )
+            for chunk in chunks:
+                chunk.metadata["chunk_id"] = _chunk_id(chunk.page_content)
             documents.extend(chunks)
 
         elif section_type == "table":
@@ -135,6 +142,7 @@ def chunk_markdown(
                                     "source": source,
                                     "type": "table_row",
                                     "heading": heading,
+                                    "chunk_id": _chunk_id(sentence),
                                 },
                             )
                         )
@@ -150,6 +158,7 @@ def chunk_markdown(
                             "source": source,
                             "type": "table",
                             "heading": heading,
+                            "chunk_id": _chunk_id(atomic),
                         },
                     )
                 )

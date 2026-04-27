@@ -53,7 +53,7 @@ _SHARED_RULES = """Hard rules — violating any of these is a failure:
 - NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
 - Do NOT repeat or rephrase anything listed under YOUR PREVIOUS LINES above — those are banned, say something new.
 - Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
-- Do NOT just restate a point already made by anyone — move the conversation forward.
+- Do NOT acknowledge, repeat, or rephrase what was just said — you heard it, skip the acknowledgment, say what you know.
 - Do not end with your handle or name. Do not start with your handle or name."""
 
 FASTJACK_TURN_PROMPT = ChatPromptTemplate.from_template(
@@ -67,13 +67,13 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-What was just said — respond to this directly:
+Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as FastJack. Exactly 2-3 sentences, no more.
-React to what was just said, then drop what you know in plain speech. If you have a name, a corp,
-or a number that fits, say it and move on. You do not ask others for information; you already have
-it or you don't care.
+You heard that. Drop what you know in plain speech — don't acknowledge what they said, just add it.
+If you have a name, a corp, or a number that fits, say it and move on. You do not ask others for
+information; you already have it or you don't care.
 FastJack speaks in clipped fragments — never more than 10 words per sentence, never a question when a statement will do.
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
@@ -112,13 +112,13 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-What was just said — respond to this directly:
+Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Bull. Exactly 2-3 sentences, no more.
-React to what was just said, then say what you actually know about who's running this, what it's
-costing, and who gets hurt. If you've seen this play before, name the outcome. Never a question,
-never speculation — you assess, you don't wonder.
+You heard that. Say what you actually know about who's running this, what it's costing, and who
+gets hurt — don't acknowledge what they said, just add your read. If you've seen this play before,
+name the outcome. Never a question, never speculation — you assess, you don't wonder.
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -134,14 +134,13 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-What was just said — respond to this directly:
+Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Coyote. Exactly 2-3 sentences, no more.
-React to what was just said, then say what the astral situation actually looks like. Whether the
-background count makes summoning dangerous, whether the spirit type is something they haven't
-dealt with, whether a ritual is still running — say it the way a mechanic talks about an engine.
-Never more than 12 words per sentence. No philosophy, no metaphor.
+You heard that. Say what the astral situation actually looks like — don't acknowledge what they
+said, just add what you know. Background count, spirit type, whether a ritual is still running —
+say it the way a mechanic talks about an engine. Never more than 12 words per sentence. No philosophy, no metaphor.
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -157,12 +156,12 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-What was just said — respond to this directly:
+Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Ledger. Exactly 2-3 sentences, no more.
-React to what was just said, then say what the financial or legal exposure actually looks like.
-Who's on the hook, how much, and why it matters to the run — in plain speech, not a report.
+You heard that. Say what the financial or legal exposure actually looks like — don't acknowledge
+what they said, just add the numbers. Who's on the hook, how much, and why it matters to the run.
 Never more than 12 words per sentence. No small talk. Never a question.
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
@@ -234,13 +233,13 @@ PERSONAS = [
 TURNS = 8  # 2 full rounds for 4 personas
 
 
-def load_retriever(vector_store: Chroma):
-    return vector_store.as_retriever(search_kwargs={"k": settings.top_k})
-
-
-def retrieve(retriever, query: str) -> str:
-    docs = retriever.invoke(query)
-    return "\n\n".join(doc.page_content for doc in docs)
+def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str]) -> tuple[str, set[str]]:
+    search_kwargs: dict = {"k": settings.top_k}
+    if exclude_ids:
+        search_kwargs["filter"] = {"chunk_id": {"$nin": list(exclude_ids)}}
+    docs = vector_store.similarity_search(query, **search_kwargs)
+    new_ids = {doc.metadata["chunk_id"] for doc in docs if "chunk_id" in doc.metadata}
+    return "\n\n".join(doc.page_content for doc in docs), new_ids
 
 
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
@@ -291,22 +290,18 @@ def run(topic: str) -> None:
         persist_directory=str(settings.chroma_path),
         embedding_function=embeddings,
     )
-    retriever = load_retriever(vector_store)
-
     history_lines: list[str] = []
     own_lines: dict[str, list[str]] = {p.handle: [] for p in PERSONAS}
+    used_ids: dict[str, set[str]] = {p.handle: set() for p in PERSONAS}
     schedule = make_schedule(TURNS)
 
     for turn, persona in enumerate(schedule):
         is_last = turn == TURNS - 1
 
         prior = own_lines[persona.handle]
-        if prior:
-            exclusion = " ".join(prior)
-            query = f"{persona.perspective} {topic} not about: {exclusion}"
-        else:
-            query = f"{persona.perspective} {topic}"
-        context = retrieve(retriever, query)
+        query = f"{topic} {persona.perspective}"
+        context, new_ids = retrieve(vector_store, query, used_ids[persona.handle])
+        used_ids[persona.handle].update(new_ids)
 
         if turn == 0:
             text = generate(
