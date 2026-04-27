@@ -75,7 +75,6 @@ React to what was just said, then drop what you know in plain speech. If you hav
 or a number that fits, say it and move on. You do not ask others for information; you already have
 it or you don't care.
 FastJack speaks in clipped fragments — never more than 10 words per sentence, never a question when a statement will do.
-Wrong: "I need to know who's paying them and how much." Right: "Ares. Berlin office. Transfer cleared three days ago."
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -120,7 +119,6 @@ Respond as Bull. Exactly 2-3 sentences, no more.
 React to what was just said, then say what you actually know about who's running this, what it's
 costing, and who gets hurt. If you've seen this play before, name the outcome. Never a question,
 never speculation — you assess, you don't wonder.
-Wrong: "The real threat here is someone with deep pockets, possibly..." Right: "Ares did this same play in Seattle. They burned the corps they partnered with once the dust settled."
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -144,7 +142,6 @@ React to what was just said, then say what the astral situation actually looks l
 background count makes summoning dangerous, whether the spirit type is something they haven't
 dealt with, whether a ritual is still running — say it the way a mechanic talks about an engine.
 Never more than 12 words per sentence. No philosophy, no metaphor.
-Wrong: "Background count: 4. Toxic zone: active near Cermak." Right: "The background count's at least a 4 out there — anything you summon is going to come out angry."
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -167,7 +164,6 @@ Respond as Ledger. Exactly 2-3 sentences, no more.
 React to what was just said, then say what the financial or legal exposure actually looks like.
 Who's on the hook, how much, and why it matters to the run — in plain speech, not a report.
 Never more than 12 words per sentence. No small talk. Never a question.
-Wrong: "Liabilities: Mitsuhama's already exposed themselves, 3x the 20K is a scratch." Right: "Mitsuhama's already on the hook for this — that 20K is just the opening bid and they know it."
 Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
@@ -304,7 +300,13 @@ def run(topic: str) -> None:
     for turn, persona in enumerate(schedule):
         is_last = turn == TURNS - 1
 
-        context = retrieve(retriever, f"{persona.perspective} {topic}")
+        prior = own_lines[persona.handle]
+        if prior:
+            exclusion = " ".join(prior)
+            query = f"{persona.perspective} {topic} not about: {exclusion}"
+        else:
+            query = f"{persona.perspective} {topic}"
+        context = retrieve(retriever, query)
 
         if turn == 0:
             text = generate(
@@ -322,7 +324,6 @@ def run(topic: str) -> None:
                 else ""
             )
             prompt = persona.turn_prompt or OPEN_PROMPT
-            prior = own_lines[persona.handle]
             own_history = (
                 "\n".join(f"- {line}" for line in prior)
                 if prior
