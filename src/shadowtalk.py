@@ -2,14 +2,16 @@
 
 Multi-turn conversation between fixed character personas. Each character queries
 the shared ChromaDB with their own perspective to get distinct lore context,
-producing different takes on the same topic.
+producing different takes on the same topic. Turn order is randomised with no
+consecutive repeats.
 
 Usage:
     uv run python src/shadowtalk.py "Tell me about Aztlan corporate security"
 """
 
+import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
@@ -24,61 +26,42 @@ from logs import logger, setup_logging
 class Persona:
     handle: str
     description: str
-    perspective: str  # prepended to retrieval query to shape what lore they pull
+    perspective: str
+    turn_prompt: ChatPromptTemplate | None = field(default=None, repr=False)
 
-
-PERSONAS = [
-    Persona(
-        handle="FastJack",
-        description=(
-            "legendary veteran decker and fixer. Old school, seen everything twice. "
-            "Speaks in short sharp sentences. Deeply cynical but rarely wrong. "
-            "Knows where the bodies are buried — literally."
-        ),
-        perspective="veteran fixer and information broker perspective on",
-    ),
-    Persona(
-        handle="Haze",
-        description=(
-            "young ork street shaman from Seattle. Passionate about awakened rights "
-            "and parazoology. Tends to ramble when excited. Asks questions others "
-            "find uncomfortable. Sees patterns others miss."
-        ),
-        perspective="street shaman and awakened community perspective on",
-    ),
-    Persona(
-        handle="Bull",
-        description=(
-            "troll ex-corporate security turned street samurai. Thinks in terms of "
-            "threats, angles, and exits. Blunt and direct. Has more corporate insider "
-            "knowledge than he lets on."
-        ),
-        perspective="street samurai and corporate security perspective on",
-    ),
-]
-
-TURNS = 6
 
 OPEN_PROMPT = ChatPromptTemplate.from_template(
     """You are {handle} in a private encrypted Shadowrun Matrix chat with other shadowrunners.
 
 Your character: {description}
 
-Relevant lore from the Shadowrun world — react to this:
+Lore pulled from the shadows — use specific details from this, don't summarise it:
 {context}
 
 Topic: {topic}
 
-Open the conversation with a reaction. 2-3 sentences. Do not start with your name or handle.
-Do not conclude or wrap anything up. Stay in character."""
+Open the conversation. Exactly 2-3 sentences, no more.
+- Your specifics must come from the lore above — do not invent locations, corps, or events not mentioned there
+- Speak from your own angle — something you saw, ran, or heard. Not "the corps do X" but name the specific corp, division, or location from the lore
+- Drop at least one specific proper noun from the lore: a corp, city, person, weapon, spell, or gang name
+- Do not start with your handle or name
+- Do not wrap up or conclude anything"""
 )
 
-TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are {handle} in a private encrypted Shadowrun Matrix chat.
+_SHARED_RULES = """Hard rules — violating any of these is a failure:
+- NEVER cite a source ("according to X", "the book says", "SRII states") — you speak from lived experience, not documents
+- NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
+- Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
+- Do NOT repeat something you yourself already said in this conversation — check your own previous lines before responding.
+- Do NOT just restate a point already made — move the conversation to new ground.
+- Do not end with your handle or name. Do not start with your handle or name."""
+
+FASTJACK_TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are FastJack in a private encrypted Shadowrun Matrix chat.
 
 Your character: {description}
 
-Relevant lore — use this to ground your response:
+Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
 Topic: {topic}
@@ -86,10 +69,103 @@ Topic: {topic}
 Conversation so far:
 {history}
 
-Respond as {handle}. 2-4 sentences. Do not start with your name or handle.
-React to what was said, add something new from the lore, challenge a point, or shift the angle.
-Stay in character. Do not conclude the conversation.{cutoff}"""
+Respond as FastJack. Exactly 2-3 sentences, no more.
+Your move: cut through the noise. Demand or supply a specific — a name, a corp, a location, a price, a date, a contact.
+If someone is being vague or wrong, correct them flatly. If a detail is missing that matters, name it.
+""" + _SHARED_RULES + "{cutoff}"
 )
+
+AELINDRA_TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are Aelindra in a private encrypted Shadowrun Matrix chat.
+
+Your character: {description}
+
+Background knowledge — treat this as things you've learned firsthand, not a document:
+{context}
+
+Topic: {topic}
+
+Conversation so far:
+{history}
+
+Respond as Aelindra. Exactly 2-3 sentences, no more.
+Your move: add the Awakened angle the others are missing. Correct a magical misconception,
+name a specific spirit type, tradition, or ritual detail from the background knowledge, or
+point out a consequence the others haven't thought through. Stay on the topic — engage with
+what was just said, then add something concrete from what you know.
+""" + _SHARED_RULES + "{cutoff}"
+)
+
+BULL_TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are Bull in a private encrypted Shadowrun Matrix chat.
+
+Your character: {description}
+
+Background knowledge — treat this as things you've learned firsthand, not a document:
+{context}
+
+Topic: {topic}
+
+Conversation so far:
+{history}
+
+Respond as Bull. Exactly 2-3 sentences, no more.
+Your move: ground it. Pull the conversation back to operational reality — who's involved, what it
+costs, what the threat actually is, who benefits. You have corporate insider knowledge; let it slip
+when it's relevant. You don't theorise, you assess.
+""" + _SHARED_RULES + "{cutoff}"
+)
+
+PERSONAS = [
+    Persona(
+        handle="FastJack",
+        description=(
+            "legendary veteran decker and fixer, male. Old school, seen everything twice. "
+            "Deeply cynical and world-weary — he's watched too many good runners die "
+            "for corp lies to believe anything at face value. Speaks in clipped, blunt "
+            "fragments — never more than 10 words per sentence. Rarely wrong, never surprised. "
+            "Does not explain himself."
+        ),
+        perspective="veteran fixer and information broker perspective on",
+        turn_prompt=FASTJACK_TURN_PROMPT,
+    ),
+    Persona(
+        handle="Aelindra",
+        description=(
+            "elven shaman, female, ancient and unhurried. Mostly direct and precise — "
+            "she has no patience for unnecessary words. Occasionally lets slip a metaphor "
+            "or an oblique reference, but only when it says more than plain speech would. "
+            "Carries centuries of memory and finds human short-termism quietly exasperating. "
+            "Will correct factual errors flatly, without softening. Knows more about the "
+            "Awakened world than she lets on and shares it sparingly."
+        ),
+        perspective="elven shaman and awakened tradition perspective on",
+        turn_prompt=AELINDRA_TURN_PROMPT,
+    ),
+    Persona(
+        handle="Bull",
+        description=(
+            "troll ex-corporate security turned street samurai, male. Blunt and pragmatic — "
+            "cuts through idealism and paranoia alike to ask who's paying and where "
+            "the exits are. Has more corporate insider knowledge than he lets on. "
+            "Thinks in terms of threats, angles, and practical outcomes."
+        ),
+        perspective="street samurai and corporate security perspective on",
+        turn_prompt=BULL_TURN_PROMPT,
+    ),
+    # Persona(
+    #     handle="Ledger",
+    #     description=(
+    #         "former mid-level Aztechnology analyst turned shadowrunner, female. Still "
+    #         "thinks in spreadsheets and risk matrices — can't help it. Nervous energy, "
+    #         "over-explains, occasionally lets slip insider knowledge she shouldn't have. "
+    #         "Trying hard to shed the corp mindset and not quite managing it."
+    #     ),
+    #     perspective="corporate insider and defector perspective on",
+    # ),
+]
+
+TURNS = 7
 
 
 def load_retriever(vector_store: Chroma):
@@ -108,6 +184,17 @@ def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
 
 def format_line(handle: str, text: str) -> str:
     return f">>>{handle.upper()}: {text}<<<"
+
+
+def pick_next(last: Persona | None, counts: dict[str, int]) -> Persona:
+    """Pick a random persona, weighted toward characters who have spoken less.
+
+    Never picks the same character twice in a row. Weight is inverse of speak
+    count so quieter characters are progressively more likely to be chosen.
+    """
+    choices = [p for p in PERSONAS if p is not last]
+    weights = [1 / (counts[p.handle] + 1) for p in choices]
+    return random.choices(choices, weights=weights, k=1)[0]
 
 
 def run(topic: str) -> None:
@@ -131,9 +218,12 @@ def run(topic: str) -> None:
     retriever = load_retriever(vector_store)
 
     history_lines: list[str] = []
+    last_persona: Persona | None = None
+    speak_counts: dict[str, int] = {p.handle: 0 for p in PERSONAS}
 
     for turn in range(TURNS):
-        persona = PERSONAS[turn % len(PERSONAS)]
+        persona = pick_next(last_persona, speak_counts)
+        speak_counts[persona.handle] += 1
         is_last = turn == TURNS - 1
 
         context = retrieve(retriever, f"{persona.perspective} {topic}")
@@ -153,9 +243,10 @@ def run(topic: str) -> None:
                 if is_last
                 else ""
             )
+            prompt = persona.turn_prompt or OPEN_PROMPT
             text = generate(
                 llm,
-                TURN_PROMPT,
+                prompt,
                 handle=persona.handle,
                 description=persona.description,
                 context=context,
@@ -168,6 +259,8 @@ def run(topic: str) -> None:
         history_lines.append(line)
         print(line)
         print()
+
+        last_persona = persona
 
     print(">>> [SIGNAL LOST] <<<")
 

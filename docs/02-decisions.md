@@ -18,6 +18,7 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 | D13 | Markdown post-processing    | Strip OCR noise, normalise with mdformat          |
 | D14 | ToC/credits/index stripping | Detect and remove front/back matter               |
 | D15 | Evaluation approach         | Two-pass: generate answers, then judge separately |
+| D16 | Shadowtalk LLM model        | llama3.1:8b (current); gemma2:9b or qwen2.5:7b as next candidates |
 
 **Infrastructure**
 
@@ -341,6 +342,34 @@ Self-scoring bias: 0.58 point inflation when a model judges its own outputs. Und
 **Consistently failing questions (score 2 across all model and top_k variants):**
 
 Q6, Q8, Q9, Q25, Q31 — structural retrieval gaps. Root cause to be investigated before further model or top_k tuning.
+
+---
+
+### D16: Shadowtalk LLM model
+
+**Decision:** `llama3.1:8b` (current). Produces acceptable output for the shadowtalk feature given the right topic framing. Model quality matters less than topic choice — a contested, multi-stakeholder situation with no single answer produces significantly better conversations than a how-to question regardless of model.
+
+**Context:** Shadowtalk is a multi-turn, multi-persona creative generation task. The model must track conversation history across 7 turns, maintain distinct character voices, avoid repeating itself, and stay grounded in retrieved lore. This is harder than single-turn RAG answering, and 7-8B models hit a capability ceiling on history tracking and instruction-following under constraint pressure.
+
+**Observed failure modes at 7-8B scale:**
+- Self-repetition: model cannot reliably check what it said 4+ turns ago
+- Hallucinated proper nouns: specificity pressure causes the model to invent locations and names not in the lore
+- Character convergence: all characters drift toward the same point when the topic has an obvious "correct" answer
+- Instruction overload: too many prompt constraints causes the model to satisfy the first few and ignore the rest
+
+**Alternatives considered / to consider:**
+
+| Model | VRAM (Q4) | Notes |
+| --- | --- | --- |
+| `llama3.1:8b` | ~5GB | Current. Decent output, acceptable history tracking |
+| `mistral:7b-instruct` | ~4.5GB | Already pulled (judge model). Tested — worse formatting discipline than llama; echoes history into output |
+| `gemma2:9b` | ~5.5GB | Top candidate. Google Gemma 2 punches above weight on instruction following; likely to handle the no-repeat constraints better |
+| `qwen2.5:7b` | ~4.5GB | Second candidate. Alibaba model, strong at multi-constraint prompts |
+| `mistral-nemo:12b` | ~7GB | Fits in 12GB VRAM with headroom. Significantly more capable but tight if embedding model is also loaded |
+
+**Hardware constraint:** RTX 3060 12GB. During shadowtalk, marker-pdf is not loaded, so full 12GB is available to Ollama. The embedding model (`mxbai-embed-large`, ~670MB) is a minor concern.
+
+**Status (2026-04-26):** `llama3.1:8b` accepted as baseline. `gemma2:9b` was tested and rejected — formatting is cleaner (no history echoing, no name prefixes) but conversation quality is worse. Gemma picks one thread and loops on it across multiple turns rather than ranging across the topic; characters repeat the same question or point 3+ times in 7 turns. `llama3.1:8b` hallucinates more proper nouns but actually moves the conversation forward. `qwen2.5:7b` remains untested and is the next candidate if llama quality becomes a problem.
 
 ---
 
