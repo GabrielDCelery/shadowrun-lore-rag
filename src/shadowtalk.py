@@ -51,9 +51,8 @@ Open the conversation. Exactly 2-3 sentences, no more.
 _SHARED_RULES = """Hard rules — violating any of these is a failure:
 - NEVER cite a source ("according to X", "the book says", "SRII states") — you speak from lived experience, not documents
 - NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
+- Do NOT repeat or rephrase anything listed under YOUR PREVIOUS LINES above — those are banned, say something new.
 - Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
-- Do NOT repeat anything from your own previous lines listed below — every sentence you write must be new ground:
-{own_history}
 - Do NOT just restate a point already made by anyone — move the conversation forward.
 - Do not end with your handle or name. Do not start with your handle or name."""
 
@@ -65,7 +64,8 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-Topic: {topic}
+YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+{own_history}
 
 Conversation so far:
 {history}
@@ -86,7 +86,8 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-Topic: {topic}
+YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+{own_history}
 
 Conversation so far:
 {history}
@@ -107,7 +108,8 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-Topic: {topic}
+YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+{own_history}
 
 Conversation so far:
 {history}
@@ -189,15 +191,24 @@ def format_line(handle: str, text: str) -> str:
     return f">>>{handle.upper()}: {text}<<<"
 
 
-def pick_next(last: Persona | None, counts: dict[str, int]) -> Persona:
-    """Pick a random persona, weighted toward characters who have spoken less.
+def format_history_line(handle: str, text: str) -> str:
+    return f"[{handle}]: {text}"
 
-    Never picks the same character twice in a row. Weight is inverse of speak
-    count so quieter characters are progressively more likely to be chosen.
+
+def make_schedule(turns: int) -> list[Persona]:
+    """Build a turn schedule: shuffled rounds of all personas, truncated to turns.
+
+    Ensures no character speaks twice in a row across round boundaries by
+    swapping if the last persona of one round matches the first of the next.
     """
-    choices = [p for p in PERSONAS if p is not last]
-    weights = [1 / (counts[p.handle] + 1) for p in choices]
-    return random.choices(choices, weights=weights, k=1)[0]
+    schedule: list[Persona] = []
+    while len(schedule) < turns:
+        round_ = PERSONAS[:]
+        random.shuffle(round_)
+        if schedule and schedule[-1] is round_[0]:
+            round_[0], round_[1] = round_[1], round_[0]
+        schedule.extend(round_)
+    return schedule[:turns]
 
 
 def run(topic: str) -> None:
@@ -222,12 +233,9 @@ def run(topic: str) -> None:
 
     history_lines: list[str] = []
     own_lines: dict[str, list[str]] = {p.handle: [] for p in PERSONAS}
-    last_persona: Persona | None = None
-    speak_counts: dict[str, int] = {p.handle: 0 for p in PERSONAS}
+    schedule = make_schedule(TURNS)
 
-    for turn in range(TURNS):
-        persona = pick_next(last_persona, speak_counts)
-        speak_counts[persona.handle] += 1
+    for turn, persona in enumerate(schedule):
         is_last = turn == TURNS - 1
 
         context = retrieve(retriever, f"{persona.perspective} {topic}")
@@ -267,12 +275,10 @@ def run(topic: str) -> None:
             )
 
         line = format_line(persona.handle, text)
-        history_lines.append(line)
+        history_lines.append(format_history_line(persona.handle, text))
         own_lines[persona.handle].append(text)
         print(line)
         print()
-
-        last_persona = persona
 
     print(">>> [SIGNAL LOST] <<<")
 
