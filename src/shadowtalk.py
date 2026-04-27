@@ -67,38 +67,40 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-Conversation so far:
-{history}
+What was just said — respond to this directly:
+{reply_to}
 
 Respond as FastJack. Exactly 2-3 sentences, no more.
-Your move: cut through the noise. Demand or supply a specific — a name, a corp, a location, a price, a date, a contact.
-If someone is being vague or wrong, correct them flatly. If a detail is missing that matters, name it.
+React to what was just said, then drop what you know in plain speech. If you have a name, a corp,
+or a number that fits, say it and move on. You do not ask others for information; you already have
+it or you don't care.
 FastJack speaks in clipped fragments — never more than 10 words per sentence, never a question when a statement will do.
-Wrong: "I need to know who's paying them and how much." Right: "Ares. Berlin office. Someone signed that cheque — find the name."
+Wrong: "I need to know who's paying them and how much." Right: "Ares. Berlin office. Transfer cleared three days ago."
+Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
-AELINDRA_TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are Aelindra in a private encrypted Shadowrun Matrix chat.
-
-Your character: {description}
-
-Background knowledge — treat this as things you've learned firsthand, not a document:
-{context}
-
-YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
-{own_history}
-
-Conversation so far:
-{history}
-
-Respond as Aelindra. Exactly 2-3 sentences, no more.
-Your move: add the Awakened angle the others are missing. Correct a magical misconception,
-name a specific spirit type, tradition, or ritual detail from the background knowledge, or
-point out a consequence the others haven't thought through. Stay on the topic — engage with
-what was just said, then add something concrete from what you know.
-""" + _SHARED_RULES + "{cutoff}"
-)
+# AELINDRA_TURN_PROMPT = ChatPromptTemplate.from_template(
+#     """You are Aelindra in a private encrypted Shadowrun Matrix chat.
+#
+#     Your character: {description}
+#
+#     Background knowledge — treat this as things you've learned firsthand, not a document:
+#     {context}
+#
+#     YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+#     {own_history}
+#
+#     Conversation so far:
+#     {history}
+#
+#     Respond as Aelindra. Exactly 2-3 sentences, no more.
+#     Your move: add the Awakened angle the others are missing. Correct a magical misconception,
+#     name a specific spirit type, tradition, or ritual detail from the background knowledge, or
+#     point out a consequence the others haven't thought through. Stay on the topic — engage with
+#     what was just said, then add something concrete from what you know.
+#     """ + _SHARED_RULES + "{cutoff}"
+# )
 
 BULL_TURN_PROMPT = ChatPromptTemplate.from_template(
     """You are Bull in a private encrypted Shadowrun Matrix chat.
@@ -111,13 +113,62 @@ Background knowledge — treat this as things you've learned firsthand, not a do
 YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
 {own_history}
 
-Conversation so far:
-{history}
+What was just said — respond to this directly:
+{reply_to}
 
 Respond as Bull. Exactly 2-3 sentences, no more.
-Your move: ground it. Pull the conversation back to operational reality — who's involved, what it
-costs, what the threat actually is, who benefits. You have corporate insider knowledge; let it slip
-when it's relevant. You don't theorise, you assess.
+React to what was just said, then say what you actually know about who's running this, what it's
+costing, and who gets hurt. If you've seen this play before, name the outcome. Never a question,
+never speculation — you assess, you don't wonder.
+Wrong: "The real threat here is someone with deep pockets, possibly..." Right: "Ares did this same play in Seattle. They burned the corps they partnered with once the dust settled."
+Never use headers, labels, or colons to introduce a point. Speak, don't report.
+""" + _SHARED_RULES + "{cutoff}"
+)
+
+COYOTE_TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are Coyote in a private encrypted Shadowrun Matrix chat.
+
+Your character: {description}
+
+Background knowledge — treat this as things you've learned firsthand, not a document:
+{context}
+
+YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+{own_history}
+
+What was just said — respond to this directly:
+{reply_to}
+
+Respond as Coyote. Exactly 2-3 sentences, no more.
+React to what was just said, then say what the astral situation actually looks like. Whether the
+background count makes summoning dangerous, whether the spirit type is something they haven't
+dealt with, whether a ritual is still running — say it the way a mechanic talks about an engine.
+Never more than 12 words per sentence. No philosophy, no metaphor.
+Wrong: "Background count: 4. Toxic zone: active near Cermak." Right: "The background count's at least a 4 out there — anything you summon is going to come out angry."
+Never use headers, labels, or colons to introduce a point. Speak, don't report.
+""" + _SHARED_RULES + "{cutoff}"
+)
+
+LEDGER_TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are Ledger in a private encrypted Shadowrun Matrix chat.
+
+Your character: {description}
+
+Background knowledge — treat this as things you've learned firsthand, not a document:
+{context}
+
+YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+{own_history}
+
+What was just said — respond to this directly:
+{reply_to}
+
+Respond as Ledger. Exactly 2-3 sentences, no more.
+React to what was just said, then say what the financial or legal exposure actually looks like.
+Who's on the hook, how much, and why it matters to the run — in plain speech, not a report.
+Never more than 12 words per sentence. No small talk. Never a question.
+Wrong: "Liabilities: Mitsuhama's already exposed themselves, 3x the 20K is a scratch." Right: "Mitsuhama's already on the hook for this — that 20K is just the opening bid and they know it."
+Never use headers, labels, or colons to introduce a point. Speak, don't report.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -125,28 +176,28 @@ PERSONAS = [
     Persona(
         handle="FastJack",
         description=(
-            "legendary veteran decker and fixer, male. Old school, seen everything twice. "
-            "Deeply cynical and world-weary — he's watched too many good runners die "
-            "for corp lies to believe anything at face value. Speaks in clipped, blunt "
-            "fragments — never more than 10 words per sentence. Rarely wrong, never surprised. "
-            "Does not explain himself."
+            "legendary veteran decker and fixer, male. Old school — been in the shadows longer "
+            "than most runners have been alive. Deeply cynical, world-weary, rarely surprised. "
+            "Knows corps, contacts, and the Matrix better than anyone. Speaks in clipped, blunt "
+            "fragments — never more than 10 words per sentence. When he has Matrix intel he drops "
+            "it plainly; when he has street intel he drops that instead. Does not explain himself."
         ),
-        perspective="veteran fixer and information broker perspective on",
+        perspective="veteran decker and fixer perspective on",
         turn_prompt=FASTJACK_TURN_PROMPT,
     ),
-    Persona(
-        handle="Aelindra",
-        description=(
-            "elven shaman, female, ancient and unhurried. Mostly direct and precise — "
-            "she has no patience for unnecessary words. Occasionally lets slip a metaphor "
-            "or an oblique reference, but only when it says more than plain speech would. "
-            "Carries centuries of memory and finds human short-termism quietly exasperating. "
-            "Will correct factual errors flatly, without softening. Knows more about the "
-            "Awakened world than she lets on and shares it sparingly."
-        ),
-        perspective="elven shaman and awakened tradition perspective on",
-        turn_prompt=AELINDRA_TURN_PROMPT,
-    ),
+    # Persona(
+    #     handle="Aelindra",
+    #     description=(
+    #         "elven shaman, female, ancient and unhurried. Mostly direct and precise — "
+    #         "she has no patience for unnecessary words. Occasionally lets slip a metaphor "
+    #         "or an oblique reference, but only when it says more than plain speech would. "
+    #         "Carries centuries of memory and finds human short-termism quietly exasperating. "
+    #         "Will correct factual errors flatly, without softening. Knows more about the "
+    #         "Awakened world than she lets on and shares it sparingly."
+    #     ),
+    #     perspective="elven shaman and awakened tradition perspective on",
+    #     turn_prompt=AELINDRA_TURN_PROMPT,
+    # ),
     Persona(
         handle="Bull",
         description=(
@@ -158,19 +209,33 @@ PERSONAS = [
         perspective="street samurai and corporate security perspective on",
         turn_prompt=BULL_TURN_PROMPT,
     ),
-    # Persona(
-    #     handle="Ledger",
-    #     description=(
-    #         "former mid-level Aztechnology analyst turned shadowrunner, female. Still "
-    #         "thinks in spreadsheets and risk matrices — can't help it. Nervous energy, "
-    #         "over-explains, occasionally lets slip insider knowledge she shouldn't have. "
-    #         "Trying hard to shed the corp mindset and not quite managing it."
-    #     ),
-    #     perspective="corporate insider and defector perspective on",
-    # ),
+    Persona(
+        handle="Coyote",
+        description=(
+            "human street shaman, female, Coyote totem. Grew up in the Barrens, learned magic "
+            "the hard way. Treats spirits as dangerous tools — respects them, doesn't romanticise "
+            "them. Knows urban astral terrain: background counts, toxic zones, spirit territories, "
+            "what kills what. Speaks plainly and fast. No mysticism, no philosophy — just "
+            "what she's seen and what it costs."
+        ),
+        perspective="street shaman and urban awakened perspective on",
+        turn_prompt=COYOTE_TURN_PROMPT,
+    ),
+    Persona(
+        handle="Ledger",
+        description=(
+            "former mid-level Aztechnology financial analyst turned shadowrunner, female. "
+            "Paranoid about exposure — always half-watching the door. Still thinks in risk "
+            "matrices, audit trails, and quarterly projections; can't turn it off. Knows "
+            "exactly how corps hide money, bury liability, and structure deniable ops. "
+            "Speaks in clipped corporate shorthand. Never uses a metaphor when a number will do."
+        ),
+        perspective="corporate financial analyst and insider perspective on",
+        turn_prompt=LEDGER_TURN_PROMPT,
+    ),
 ]
 
-TURNS = 7
+TURNS = 8  # 2 full rounds for 4 personas
 
 
 def load_retriever(vector_store: Chroma):
@@ -182,9 +247,23 @@ def retrieve(retriever, query: str) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
 
 
+def trim_to_sentences(text: str, max_sentences: int = 2) -> str:
+    """Trim generated text to max_sentences and flatten to a single line."""
+    import re
+
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    if not sentences:
+        return text.strip()
+
+    return " ".join(sentences[:max_sentences])
+
+
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
     chain = prompt | llm | StrOutputParser()
-    return chain.invoke(kwargs).strip()
+    raw = chain.invoke(kwargs).strip()
+    return trim_to_sentences(raw)
 
 
 def format_line(handle: str, text: str) -> str:
@@ -262,6 +341,8 @@ def run(topic: str) -> None:
                 if prior
                 else "(none yet — this is your first turn)"
             )
+            other_lines = [l for l in history_lines if not l.startswith(f"[{persona.handle}]")]
+            reply_to = "\n".join(other_lines[-2:]) if other_lines else "(you are first to speak)"
             text = generate(
                 llm,
                 prompt,
@@ -269,7 +350,7 @@ def run(topic: str) -> None:
                 description=persona.description,
                 context=context,
                 topic=topic,
-                history="\n".join(history_lines),
+                reply_to=reply_to,
                 own_history=own_history,
                 cutoff=cutoff,
             )
