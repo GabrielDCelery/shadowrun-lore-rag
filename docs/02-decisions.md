@@ -19,6 +19,12 @@ Decisions inferred from the codebase and prior decision log. Code tells you what
 | D14 | ToC/credits/index stripping | Detect and remove front/back matter               |
 | D15 | Evaluation approach         | Two-pass: generate answers, then judge separately |
 | D16 | Shadowtalk LLM model        | llama3.1:8b (current); gemma2:9b or qwen2.5:7b as next candidates |
+| D17 | Shadowtalk retrieval query  | Topic-first: `"{topic} {persona.perspective}"` |
+| D18 | Shadowtalk retrieval diversity | Chunk ID exclusion via ChromaDB `$nin` filter per persona |
+| D19 | Shadowtalk own_history      | LLM-generated topic summary instead of raw previous lines |
+| D20 | Shadowtalk conversation window | Window-based reply_to: last 2 non-self lines only |
+| D21 | Shadowtalk character name filtering | `where_document $not_contains handle` to exclude self-referencing chunks |
+| D22 | Shadowtalk persona voice    | Experiential/positional voice with distinct per-character angle |
 
 **Infrastructure**
 
@@ -370,6 +376,74 @@ Q6, Q8, Q9, Q25, Q31 — structural retrieval gaps. Root cause to be investigate
 **Hardware constraint:** RTX 3060 12GB. During shadowtalk, marker-pdf is not loaded, so full 12GB is available to Ollama. The embedding model (`mxbai-embed-large`, ~670MB) is a minor concern.
 
 **Status (2026-04-26):** `llama3.1:8b` accepted as baseline. `gemma2:9b` was tested and rejected — formatting is cleaner (no history echoing, no name prefixes) but conversation quality is worse. Gemma picks one thread and loops on it across multiple turns rather than ranging across the topic; characters repeat the same question or point 3+ times in 7 turns. `llama3.1:8b` hallucinates more proper nouns but actually moves the conversation forward. `qwen2.5:7b` remains untested and is the next candidate if llama quality becomes a problem.
+
+---
+
+### D17: Shadowtalk retrieval query order
+
+**Decision:** Topic-first query: `f"{topic} {persona.perspective}"`. Persona perspective appended, not prepended.
+
+**Context:** Initial design used `f"{persona.perspective} {topic}"`. Embedding models weight earlier tokens more heavily — prepending the persona caused the embedding to anchor on the persona's semantic space, pulling off-topic chunks when no lore intersection exists between the persona's angle and the topic (e.g. Coyote getting LA hearth spirit chunks when asked about corporate takeovers).
+
+**Why:** Topic-first ensures retrieval anchors on the actual subject. The persona suffix still biases toward persona-relevant chunks when the intersection exists in the lore; when it doesn't, it falls back to on-topic content rather than off-topic persona content.
+
+---
+
+### D18: Shadowtalk retrieval diversity via chunk ID exclusion
+
+**Decision:** Track which chunk IDs each persona retrieved per conversation. On subsequent turns, exclude those IDs via ChromaDB's `where={"chunk_id": {"$nin": [...]}}` filter. Chunk IDs stored as SHA1 hash of content in metadata at embedding time (`chunk_id` field in `chunk_documents.py`).
+
+**Context:** Without exclusion, a persona gets the same top-k chunks on every turn (same query → same embedding → same nearest neighbours). The model then has identical context and reproduces identical or near-identical content despite the `own_history` prompt rule.
+
+**Why not over-fetch + Python filter:** ChromaDB's `$nin` filter excludes at the database level before results are returned. Over-fetching (`k * 3`) and slicing in Python is redundant — the DB handles it correctly with just `k=settings.top_k`.
+
+**Limitation:** Chunk ID exclusion prevents same-chunk retrieval but not same-topic retrieval. If the same facts appear across many chunks (common in Shadowrun sourcebooks), a persona can still get different chunks carrying identical information.
+
+---
+
+### D19: Shadowtalk own_history as topic summary
+
+**Decision:** Before each persona's subsequent turn, make a lightweight LLM call to summarise their prior lines into a compact topic list ("• background count danger • ongoing banishment ritual • astral noise"). Pass this summary as `own_history` instead of raw previous lines.
+
+**Context:** Raw previous lines in the prompt allow the model to avoid exact wording but not semantic repetition — it paraphrases the same points rather than finding genuinely different angles. A topic-level summary gives the model a map of covered territory that it must avoid regardless of phrasing.
+
+**Cost:** One extra LLM call per persona per subsequent turn. With 4 personas and 2 turns each, at most 4 extra calls per conversation.
+
+**Limitation:** The summary is only as good as the summariser. If the LLM collapses distinct proper nouns into vague categories ("corporate activity"), the model cannot reliably distinguish covered from uncovered ground. Prompt instructs extraction of specific proper nouns.
+
+---
+
+### D20: Shadowtalk window-based conversation context
+
+**Decision:** Each character's turn prompt receives only the last 2 non-self lines as `reply_to` context, not the full conversation history.
+
+**Context:** Full history was tried and produced incoherent output — models at 7-8B scale cannot reliably synthesise and respect a growing history list under simultaneous persona, voice, and repetition constraints. The window approach keeps the conversation flowing naturally: each character hears what was just said and responds, like a real conversation.
+
+**Trade-off:** The narrow window means characters cannot see what was said more than 2 turns ago. A point can re-enter the conversation after it leaves the window. This is acceptable — real conversation has the same property — but means the `own_history` summary is critical to prevent self-repetition across the longer span.
+
+---
+
+### D21: Shadowtalk character name filtering
+
+**Decision:** Exclude chunks mentioning the character's own handle from their retrieval results via `where_document={"$not_contains": handle}`.
+
+**Context:** FastJack, Bull, and Coyote are canonical Shadowrun NPCs who post commentary throughout sourcebooks (JackPoint, Shadowland BBS). Retrieving a chunk where FastJack is already commenting on a topic and then asking the model to BE FastJack with that chunk as "firsthand knowledge" caused the model to reproduce or confuse the sourced content with what it should generate.
+
+**Why:** Prevents any character from reading lore that is about themselves. Clean separation between character voice (prompt) and lore context (retrieval).
+
+---
+
+### D22: Shadowtalk persona voice design
+
+**Decision:** Each persona speaks from a specific experiential angle — not "what the situation looks like" (reporting) but what they personally encountered, concluded, or fear. Each persona has a distinct second gear to avoid converging on general cynicism.
+
+**Angles:**
+- **FastJack** — cuts to motive: not what is happening but who set it up, why now, who walks away clean. Clipped fragments, never more than 10 words per sentence.
+- **Bull** — reads op structure: what kind of team, whether it's official or deniable, what that composition reveals about the real objective. Speaks from ops he's run, not general cynicism about corps.
+- **Coyote** — speaks from something she personally encountered in the astral: a spirit she had to dodge, a zone she couldn't push through, something that felt wrong. Mechanic talking about an engine, not a shaman philosophising.
+- **Ledger** — speaks from fear and pattern recognition: she left Aztec because she knows how it ends for people who know too much. Notices when corps go quiet, when assets move, when executives disappear from agendas. Expresses risk as behaviour, never invents numbers.
+
+**Why distinct angles matter:** Without a specific angle, personas default to general genre-appropriate output that converges across turns. A distinct angle gives the model a different dimension to explore each time, and breaks the dependency on retrieved content having new facts.
 
 ---
 
