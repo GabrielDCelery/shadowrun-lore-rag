@@ -52,8 +52,9 @@ _SHARED_RULES = """Hard rules — violating any of these is a failure:
 - NEVER cite a source ("according to X", "the book says", "SRII states") — you speak from lived experience, not documents
 - NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
 - Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
-- Do NOT repeat something you yourself already said in this conversation — check your own previous lines before responding.
-- Do NOT just restate a point already made — move the conversation to new ground.
+- Do NOT repeat anything from your own previous lines listed below — every sentence you write must be new ground:
+{own_history}
+- Do NOT just restate a point already made by anyone — move the conversation forward.
 - Do not end with your handle or name. Do not start with your handle or name."""
 
 FASTJACK_TURN_PROMPT = ChatPromptTemplate.from_template(
@@ -72,6 +73,8 @@ Conversation so far:
 Respond as FastJack. Exactly 2-3 sentences, no more.
 Your move: cut through the noise. Demand or supply a specific — a name, a corp, a location, a price, a date, a contact.
 If someone is being vague or wrong, correct them flatly. If a detail is missing that matters, name it.
+FastJack speaks in clipped fragments — never more than 10 words per sentence, never a question when a statement will do.
+Wrong: "I need to know who's paying them and how much." Right: "Ares. Berlin office. Someone signed that cheque — find the name."
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -218,6 +221,7 @@ def run(topic: str) -> None:
     retriever = load_retriever(vector_store)
 
     history_lines: list[str] = []
+    own_lines: dict[str, list[str]] = {p.handle: [] for p in PERSONAS}
     last_persona: Persona | None = None
     speak_counts: dict[str, int] = {p.handle: 0 for p in PERSONAS}
 
@@ -244,6 +248,12 @@ def run(topic: str) -> None:
                 else ""
             )
             prompt = persona.turn_prompt or OPEN_PROMPT
+            prior = own_lines[persona.handle]
+            own_history = (
+                "\n".join(f"- {line}" for line in prior)
+                if prior
+                else "(none yet — this is your first turn)"
+            )
             text = generate(
                 llm,
                 prompt,
@@ -252,11 +262,13 @@ def run(topic: str) -> None:
                 context=context,
                 topic=topic,
                 history="\n".join(history_lines),
+                own_history=own_history,
                 cutoff=cutoff,
             )
 
         line = format_line(persona.handle, text)
         history_lines.append(line)
+        own_lines[persona.handle].append(text)
         print(line)
         print()
 

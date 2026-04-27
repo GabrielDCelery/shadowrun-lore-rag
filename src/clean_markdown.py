@@ -36,6 +36,10 @@ NAV_EMOJI_RE = re.compile(r"[🗆🔲]")
 # Navigation bar pattern: 2+ all-caps words followed by "Page N"
 NAV_BAR_RE = re.compile(r"(?:[A-Z]{3,}\s+){2,}Page\s+\d+.*")
 
+# Index entry artifact: 3+ all-caps words (possibly with colons/numbers interspersed)
+# e.g. "NY MEGAPLEX STATES AWAKENED WESTPHALIA BERLIN MAGIC: 81"
+INDEX_ENTRY_RE = re.compile(r"^(?:[A-Z][A-Z0-9]{2,}\s+){3,}[A-Z][A-Z0-9]*[:\s]+\d+\s*$")
+
 # Malformed table row: all cells contain only punctuation/whitespace
 MALFORMED_TABLE_RE = re.compile(r"^\|[\s,\.;:!\?|]+\|$")
 
@@ -175,6 +179,9 @@ def postprocess(content: str) -> str:
             continue
 
         if is_malformed_table_row(line):
+            continue
+
+        if INDEX_ENTRY_RE.match(line):
             continue
 
         # if not line.strip().startswith("|"):
