@@ -247,23 +247,10 @@ def retrieve(retriever, query: str) -> str:
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-def trim_to_sentences(text: str, max_sentences: int = 2) -> str:
-    """Trim generated text to max_sentences and flatten to a single line."""
-    import re
-
-    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
-    sentences = [s.strip() for s in sentences if s.strip()]
-
-    if not sentences:
-        return text.strip()
-
-    return " ".join(sentences[:max_sentences])
-
-
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
     chain = prompt | llm | StrOutputParser()
     raw = chain.invoke(kwargs).strip()
-    return trim_to_sentences(raw)
+    return " ".join(raw.split())
 
 
 def format_line(handle: str, text: str) -> str:
