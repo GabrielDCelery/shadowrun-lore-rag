@@ -30,6 +30,16 @@ class Persona:
     turn_prompt: ChatPromptTemplate | None = field(default=None, repr=False)
 
 
+SUMMARY_PROMPT = ChatPromptTemplate.from_template(
+    """Extract the key factual topics from these statements as a compact bullet list.
+One short phrase per point — topics and facts only, not the exact wording.
+
+Statements:
+{lines}
+
+Bullet list of topics covered:"""
+)
+
 OPEN_PROMPT = ChatPromptTemplate.from_template(
     """You are {handle} in a private encrypted Shadowrun Matrix chat with other shadowrunners.
 
@@ -51,7 +61,7 @@ Open the conversation. Exactly 2-3 sentences, no more.
 _SHARED_RULES = """Hard rules — violating any of these is a failure:
 - NEVER cite a source ("according to X", "the book says", "SRII states") — you speak from lived experience, not documents
 - NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
-- Do NOT repeat or rephrase anything listed under YOUR PREVIOUS LINES above — those are banned, say something new.
+- Do NOT revisit any topic listed under TOPICS YOU HAVE ALREADY COVERED above — those angles are taken, find something new in the context.
 - Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
 - Do NOT acknowledge, repeat, or rephrase what was just said — you heard it, skip the acknowledgment, say what you know.
 - Do not end with your handle or name. Do not start with your handle or name."""
@@ -64,18 +74,18 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
 {own_history}
 
 Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as FastJack. Exactly 2-3 sentences, no more.
-You heard that. Drop what you know in plain speech — don't acknowledge what they said, just add it.
-If you have a name, a corp, or a number that fits, say it and move on. You do not ask others for
-information; you already have it or you don't care.
-FastJack speaks in clipped fragments — never more than 10 words per sentence, never a question when a statement will do.
-Never use headers, labels, or colons to introduce a point. Speak, don't report.
+You're not briefing anyone. You're thinking out loud — dropping something because it's relevant,
+not because you were asked. Speak from what you've seen or what you've dug up. If a name or a
+corp connects, say it and move on. You don't explain yourself and you don't wonder out loud.
+FastJack speaks in clipped fragments — never more than 10 words per sentence.
+Never use headers, labels, or colons to introduce a point.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -109,17 +119,18 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
 {own_history}
 
 Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Bull. Exactly 2-3 sentences, no more.
-You heard that. Say what you actually know about who's running this, what it's costing, and who
-gets hurt — don't acknowledge what they said, just add your read. If you've seen this play before,
-name the outcome. Never a question, never speculation — you assess, you don't wonder.
-Never use headers, labels, or colons to introduce a point. Speak, don't report.
+Speak from where you stand — what this means for the people actually on the ground, what the suits
+won't say, what you'd do if you were running this op. You've been inside corps; you know how these
+calls get made and who ends up holding the bag. Sound like someone who's been there, not someone
+reading a sitrep. Never a question, never speculation — you've seen enough to just say it.
+Never use headers, labels, or colons to introduce a point.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -131,17 +142,18 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
 {own_history}
 
 Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Coyote. Exactly 2-3 sentences, no more.
-You heard that. Say what the astral situation actually looks like — don't acknowledge what they
-said, just add what you know. Background count, spirit type, whether a ritual is still running —
-say it the way a mechanic talks about an engine. Never more than 12 words per sentence. No philosophy, no metaphor.
-Never use headers, labels, or colons to introduce a point. Speak, don't report.
+Speak from something you personally ran into — a spirit you had to dodge, a zone you couldn't
+push through, something that felt wrong in the astral. Not a status report on the situation.
+Like telling someone what it was like to be there, not describing it from the outside.
+Never more than 12 words per sentence. No philosophy, no metaphor.
+Never use headers, labels, or colons to introduce a point.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -153,17 +165,18 @@ Your character: {description}
 Background knowledge — treat this as things you've learned firsthand, not a document:
 {context}
 
-YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
+TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
 {own_history}
 
 Last said (context only — you heard it, do not restate it):
 {reply_to}
 
 Respond as Ledger. Exactly 2-3 sentences, no more.
-You heard that. Say what the financial or legal exposure actually looks like — don't acknowledge
-what they said, just add the numbers. Who's on the hook, how much, and why it matters to the run.
-Never more than 12 words per sentence. No small talk. Never a question.
-Never use headers, labels, or colons to introduce a point. Speak, don't report.
+Speak from recognition, not analysis — something here matches a pattern you've lived through, and
+you know how it ends. Say who's going quiet, who's moving, what that means for anyone caught in
+the middle. One observation. One consequence. Stop there — you don't want to think past that.
+Never more than 12 words per sentence. Never a number you didn't get from the lore above.
+Never use headers, labels, or colons to introduce a point.
 """ + _SHARED_RULES + "{cutoff}"
 )
 
@@ -220,10 +233,13 @@ PERSONAS = [
         handle="Ledger",
         description=(
             "former mid-level Aztechnology financial analyst turned shadowrunner, female. "
-            "Paranoid about exposure — always half-watching the door. Still thinks in risk "
-            "matrices, audit trails, and quarterly projections; can't turn it off. Knows "
-            "exactly how corps hide money, bury liability, and structure deniable ops. "
-            "Speaks in clipped corporate shorthand. Never uses a metaphor when a number will do."
+            "Left Aztec because she saw how it ends for people who know too much — and she "
+            "knows too much. Paranoid in a specific way: she recognises corp plays the way "
+            "you recognise a con you've been run before. Watches for who goes quiet, who "
+            "moves assets, who disappears from meeting agendas. Speaks in short tight bursts "
+            "— not because she's efficient but because she's always listening for the door. "
+            "Never invents a number. Expresses risk as behaviour: who moves, who goes silent, "
+            "who starts covering tracks."
         ),
         perspective="corporate financial analyst and insider perspective on",
         turn_prompt=LEDGER_TURN_PROMPT,
@@ -240,6 +256,14 @@ def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str]) -> tuple[s
     docs = vector_store.similarity_search(query, **search_kwargs)
     new_ids = {doc.metadata["chunk_id"] for doc in docs if "chunk_id" in doc.metadata}
     return "\n\n".join(doc.page_content for doc in docs), new_ids
+
+
+def summarise_own_history(llm: ChatOllama, lines: list[str]) -> str:
+    if not lines:
+        return "(none yet — this is your first turn)"
+    chain = SUMMARY_PROMPT | llm | StrOutputParser()
+    result = chain.invoke({"lines": "\n".join(f"- {l}" for l in lines)})
+    return result.strip()
 
 
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
@@ -319,11 +343,7 @@ def run(topic: str) -> None:
                 else ""
             )
             prompt = persona.turn_prompt or OPEN_PROMPT
-            own_history = (
-                "\n".join(f"- {line}" for line in prior)
-                if prior
-                else "(none yet — this is your first turn)"
-            )
+            own_history = summarise_own_history(llm, prior)
             other_lines = [l for l in history_lines if not l.startswith(f"[{persona.handle}]")]
             reply_to = "\n".join(other_lines[-2:]) if other_lines else "(you are first to speak)"
             text = generate(
