@@ -249,10 +249,11 @@ PERSONAS = [
 TURNS = 8  # 2 full rounds for 4 personas
 
 
-def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str]) -> tuple[str, set[str]]:
+def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str], handle: str) -> tuple[str, set[str]]:
     search_kwargs: dict = {"k": settings.top_k}
     if exclude_ids:
         search_kwargs["filter"] = {"chunk_id": {"$nin": list(exclude_ids)}}
+    search_kwargs["where_document"] = {"$not_contains": handle}
     docs = vector_store.similarity_search(query, **search_kwargs)
     new_ids = {doc.metadata["chunk_id"] for doc in docs if "chunk_id" in doc.metadata}
     return "\n\n".join(doc.page_content for doc in docs), new_ids
@@ -324,7 +325,7 @@ def run(topic: str) -> None:
 
         prior = own_lines[persona.handle]
         query = f"{topic} {persona.perspective}"
-        context, new_ids = retrieve(vector_store, query, used_ids[persona.handle])
+        context, new_ids = retrieve(vector_store, query, used_ids[persona.handle], persona.handle)
         used_ids[persona.handle].update(new_ids)
 
         if turn == 0:
