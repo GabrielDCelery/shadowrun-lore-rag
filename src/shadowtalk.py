@@ -27,156 +27,31 @@ class Persona:
     handle: str
     description: str
     perspective: str
-    turn_prompt: ChatPromptTemplate | None = field(default=None, repr=False)
 
-
-SUMMARY_PROMPT = ChatPromptTemplate.from_template(
-    """Extract the key factual topics from these statements as a compact bullet list.
-One short phrase per point — topics and facts only, not the exact wording.
-
-Statements:
-{lines}
-
-Bullet list of topics covered:"""
-)
 
 OPEN_PROMPT = ChatPromptTemplate.from_template(
-    """You are {handle} in a private encrypted Shadowrun Matrix chat with other shadowrunners.
+    """You are {handle} in a private Shadowrun Matrix chat with other shadowrunners.
 
-Your character: {description}
-
-Lore pulled from the shadows — use specific details from this, don't summarise it:
+Background knowledge:
 {context}
 
 Topic: {topic}
 
-Open the conversation. Exactly 2-3 sentences, no more.
-- Your specifics must come from the lore above — do not invent locations, corps, or events not mentioned there
-- Speak from your own angle — something you saw, ran, or heard. Not "the corps do X" but name the specific corp, division, or location from the lore
-- Drop at least one specific proper noun from the lore: a corp, city, person, weapon, spell, or gang name
-- Do not start with your handle or name
-- Do not wrap up or conclude anything"""
+Open the conversation in 2-3 sentences. Use a specific detail from the background above.
+Do not invent names or places not mentioned in the background."""
 )
 
-_SHARED_RULES = """Hard rules — violating any of these is a failure:
-- NEVER cite a source ("according to X", "the book says", "SRII states") — you speak from lived experience, not documents
-- NEVER invent a specific location or character name that does not appear in the background knowledge above. If you need a place, use a vague descriptor ("an Aztechnology compound", "a Barrens factory", "downtown Seattle") not an invented proper noun.
-- Do NOT revisit any topic listed under TOPICS YOU HAVE ALREADY COVERED above — those angles are taken, find something new in the context.
-- Do NOT claim an experience another character already claimed — you were not on their run, you did not see what they saw.
-- Do NOT acknowledge, repeat, or rephrase what was just said — you heard it, skip the acknowledgment, say what you know.
-- Do not end with your handle or name. Do not start with your handle or name."""
+TURN_PROMPT = ChatPromptTemplate.from_template(
+    """You are {handle} in a private Shadowrun Matrix chat with other shadowrunners.
 
-FASTJACK_TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are FastJack in a private encrypted Shadowrun Matrix chat.
-
-Your character: {description}
-
-Background knowledge — treat this as things you've learned firsthand, not a document:
+Background knowledge:
 {context}
 
-TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
-{own_history}
-
-Last said (context only — you heard it, do not restate it):
+Last said:
 {reply_to}
 
-Respond as FastJack. Exactly 2-3 sentences, no more.
-Cut to why — not what's happening, but who set it up, why now, who walks away clean when it's
-over. You've seen enough plays to recognise the shape of this one. One cut, not a briefing.
-Never more than 10 words per sentence. Never a question when a conclusion will do.
-Never use headers, labels, or colons to introduce a point.
-""" + _SHARED_RULES + "{cutoff}"
-)
-
-# AELINDRA_TURN_PROMPT = ChatPromptTemplate.from_template(
-#     """You are Aelindra in a private encrypted Shadowrun Matrix chat.
-#
-#     Your character: {description}
-#
-#     Background knowledge — treat this as things you've learned firsthand, not a document:
-#     {context}
-#
-#     YOUR PREVIOUS LINES — do not repeat or rephrase any of these:
-#     {own_history}
-#
-#     Conversation so far:
-#     {history}
-#
-#     Respond as Aelindra. Exactly 2-3 sentences, no more.
-#     Your move: add the Awakened angle the others are missing. Correct a magical misconception,
-#     name a specific spirit type, tradition, or ritual detail from the background knowledge, or
-#     point out a consequence the others haven't thought through. Stay on the topic — engage with
-#     what was just said, then add something concrete from what you know.
-#     """ + _SHARED_RULES + "{cutoff}"
-# )
-
-BULL_TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are Bull in a private encrypted Shadowrun Matrix chat.
-
-Your character: {description}
-
-Background knowledge — treat this as things you've learned firsthand, not a document:
-{context}
-
-TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
-{own_history}
-
-Last said (context only — you heard it, do not restate it):
-{reply_to}
-
-Respond as Bull. Exactly 2-3 sentences, no more.
-Read the op structure — what kind of team they're using, whether it's official or deniable, what
-that choice tells you about the real objective. Speak from something specific you've run or seen
-run, not from general cynicism about corps. Name the play, not the principle.
-Never a question, never speculation — you've seen enough to just say it.
-Never use headers, labels, or colons to introduce a point.
-""" + _SHARED_RULES + "{cutoff}"
-)
-
-COYOTE_TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are Coyote in a private encrypted Shadowrun Matrix chat.
-
-Your character: {description}
-
-Background knowledge — treat this as things you've learned firsthand, not a document:
-{context}
-
-TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
-{own_history}
-
-Last said (context only — you heard it, do not restate it):
-{reply_to}
-
-Respond as Coyote. Exactly 2-3 sentences, no more.
-Speak from something you personally ran into — a spirit you had to dodge, a zone you couldn't
-push through, something that felt wrong in the astral. Not a status report on the situation.
-Like telling someone what it was like to be there, not describing it from the outside.
-Never more than 12 words per sentence. No philosophy, no metaphor.
-Never use headers, labels, or colons to introduce a point.
-""" + _SHARED_RULES + "{cutoff}"
-)
-
-LEDGER_TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are Ledger in a private encrypted Shadowrun Matrix chat.
-
-Your character: {description}
-
-Background knowledge — treat this as things you've learned firsthand, not a document:
-{context}
-
-TOPICS YOU HAVE ALREADY COVERED — do not revisit any of these, find a different angle:
-{own_history}
-
-Last said (context only — you heard it, do not restate it):
-{reply_to}
-
-Respond as Ledger. Exactly 2-3 sentences, no more.
-Speak from recognition, not analysis — something here matches a pattern you've lived through, and
-you know how it ends. Say who's going quiet, who's moving, what that means for anyone caught in
-the middle. One observation. One consequence. Stop there — you don't want to think past that.
-Never more than 12 words per sentence. Never a number you didn't get from the lore above.
-Never use headers, labels, or colons to introduce a point.
-""" + _SHARED_RULES + "{cutoff}"
+Respond in 2-3 sentences. React to what was just said — push further on it, contradict it, or name what it implies.
+Use what you know from the background above. Do not invent names or places not in the background.{cutoff}"""
 )
 
 PERSONAS = [
@@ -191,21 +66,7 @@ PERSONAS = [
             "it points at something bigger. States conclusions, never speculates out loud."
         ),
         perspective="veteran decker and fixer perspective on",
-        turn_prompt=FASTJACK_TURN_PROMPT,
     ),
-    # Persona(
-    #     handle="Aelindra",
-    #     description=(
-    #         "elven shaman, female, ancient and unhurried. Mostly direct and precise — "
-    #         "she has no patience for unnecessary words. Occasionally lets slip a metaphor "
-    #         "or an oblique reference, but only when it says more than plain speech would. "
-    #         "Carries centuries of memory and finds human short-termism quietly exasperating. "
-    #         "Will correct factual errors flatly, without softening. Knows more about the "
-    #         "Awakened world than she lets on and shares it sparingly."
-    #     ),
-    #     perspective="elven shaman and awakened tradition perspective on",
-    #     turn_prompt=AELINDRA_TURN_PROMPT,
-    # ),
     Persona(
         handle="Bull",
         description=(
@@ -217,7 +78,6 @@ PERSONAS = [
             "Speaks from what he's run or seen run, not from what he thinks corps are like."
         ),
         perspective="street samurai and corporate security perspective on",
-        turn_prompt=BULL_TURN_PROMPT,
     ),
     Persona(
         handle="Coyote",
@@ -229,7 +89,6 @@ PERSONAS = [
             "what she's seen and what it costs."
         ),
         perspective="street shaman and urban awakened perspective on",
-        turn_prompt=COYOTE_TURN_PROMPT,
     ),
     Persona(
         handle="Ledger",
@@ -244,14 +103,15 @@ PERSONAS = [
             "which exec goes silent, who starts restructuring."
         ),
         perspective="corporate financial analyst and insider perspective on",
-        turn_prompt=LEDGER_TURN_PROMPT,
     ),
 ]
 
 TURNS = 8  # 2 full rounds for 4 personas
 
 
-def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str], handle: str) -> tuple[str, set[str]]:
+def retrieve(
+    vector_store: Chroma, query: str, exclude_ids: set[str], handle: str
+) -> tuple[str, set[str]]:
     search_kwargs: dict = {"k": settings.top_k}
     if exclude_ids:
         search_kwargs["filter"] = {"chunk_id": {"$nin": list(exclude_ids)}}
@@ -259,14 +119,6 @@ def retrieve(vector_store: Chroma, query: str, exclude_ids: set[str], handle: st
     docs = vector_store.similarity_search(query, **search_kwargs)
     new_ids = {doc.metadata["chunk_id"] for doc in docs if "chunk_id" in doc.metadata}
     return "\n\n".join(doc.page_content for doc in docs), new_ids
-
-
-def summarise_own_history(llm: ChatOllama, lines: list[str]) -> str:
-    if not lines:
-        return "(none yet — this is your first turn)"
-    chain = SUMMARY_PROMPT | llm | StrOutputParser()
-    result = chain.invoke({"lines": "\n".join(f"- {l}" for l in lines)})
-    return result.strip()
 
 
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
@@ -277,10 +129,6 @@ def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
 
 def format_line(handle: str, text: str) -> str:
     return f">>>{handle.upper()}: {text}<<<"
-
-
-def format_history_line(handle: str, text: str) -> str:
-    return f"[{handle}]: {text}"
 
 
 def make_schedule(turns: int) -> list[Persona]:
@@ -318,16 +166,16 @@ def run(topic: str) -> None:
         embedding_function=embeddings,
     )
     history_lines: list[str] = []
-    own_lines: dict[str, list[str]] = {p.handle: [] for p in PERSONAS}
     used_ids: dict[str, set[str]] = {p.handle: set() for p in PERSONAS}
     schedule = make_schedule(TURNS)
 
     for turn, persona in enumerate(schedule):
         is_last = turn == TURNS - 1
 
-        prior = own_lines[persona.handle]
         query = f"{topic} {persona.perspective}"
-        context, new_ids = retrieve(vector_store, query, used_ids[persona.handle], persona.handle)
+        context, new_ids = retrieve(
+            vector_store, query, used_ids[persona.handle], persona.handle
+        )
         used_ids[persona.handle].update(new_ids)
 
         if turn == 0:
@@ -335,7 +183,6 @@ def run(topic: str) -> None:
                 llm,
                 OPEN_PROMPT,
                 handle=persona.handle,
-                description=persona.description,
                 context=context,
                 topic=topic,
             )
@@ -345,26 +192,20 @@ def run(topic: str) -> None:
                 if is_last
                 else ""
             )
-            prompt = persona.turn_prompt or OPEN_PROMPT
-            own_history = summarise_own_history(llm, prior)
-            other_lines = [l for l in history_lines if not l.startswith(f"[{persona.handle}]")]
-            reply_to = "\n".join(other_lines[-2:]) if other_lines else "(you are first to speak)"
+            reply_to = (
+                history_lines[-1] if history_lines else "(you are first to speak)"
+            )
             text = generate(
                 llm,
-                prompt,
+                TURN_PROMPT,
                 handle=persona.handle,
-                description=persona.description,
                 context=context,
-                topic=topic,
                 reply_to=reply_to,
-                own_history=own_history,
                 cutoff=cutoff,
             )
 
-        line = format_line(persona.handle, text)
-        history_lines.append(format_history_line(persona.handle, text))
-        own_lines[persona.handle].append(text)
-        print(line)
+        history_lines.append(f"[{persona.handle}]: {text}")
+        print(format_line(persona.handle, text))
         print()
 
     print(">>> [SIGNAL LOST] <<<")
