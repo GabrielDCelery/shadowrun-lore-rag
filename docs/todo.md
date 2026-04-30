@@ -53,11 +53,23 @@
 - [ ] Chainlit chat UI as a separate container in `personal-homelab` repo — calls the RAG API
 - [x] Shadowtalk conversation generator — implemented in `src/shadowtalk.py`:
   - 4 fixed personas: FastJack, Bull, Coyote, Ledger — each with a distinct experiential angle
-  - Topic-first retrieval query with persona perspective appended (D17)
-  - Chunk ID exclusion per persona to force retrieval diversity across turns (D18)
-  - Character name filtering via `where_document $not_contains` to prevent self-referencing lore (D21)
-  - LLM-generated topic summary as own_history to prevent semantic self-repetition (D19)
-  - Window-based reply_to: last 2 non-self lines (D20)
-  - 8 turns, cuts off mid-sentence at the end
-  - Outstanding: retrieval debug logging to verify groundedness; Coyote still occasionally retrieves off-topic chunks on first turn
+  - Topic-first retrieval query with persona perspective appended
+  - Shared chunk ID exclusion across turns (intended to force diversity; see known issue below)
+  - Character name filtering via `where_document $not_contains` to prevent self-referencing lore
+  - reply_to = last line from history (single line, any character)
+  - 8 turns, cuts off mid-sentence at the end, debug mode outputs JSON with chunks
+
+### Shadowtalk quality issues (from conversation analysis 2026-04-29)
+
+| Issue                         | Root cause                                        | Fix                                                      |
+| ----------------------------- | ------------------------------------------------- | -------------------------------------------------------- |
+| Duplicate chunks across turns | `$nin` filter on `chunk_id` silently failing      | Verify `chunk_id` in metadata; test filter independently |
+| Hallucination snowball        | Characters build on prior invented claims         | Prompt rule: only assert facts from background context   |
+| NPC dialogue bleed            | In-universe dialogue in chunks bleeds into output | Prompt rule: never reproduce dialogue from background    |
+| Topic drift                   | Topic absent from `TURN_PROMPT`; lost by turn 5-6 | Add `topic: {topic}` to turn prompt                      |
+
+- [ ] Shadowtalk: chunk deduplication filter broken — the `$nin` metadata filter on `chunk_id` is silently failing; the same chunks repeat across multiple turns in the same conversation; needs diagnosis (verify `chunk_id` is stored in metadata, test filter independently)
+- [ ] Shadowtalk: hallucination snowball — characters build invented claims from the prior message rather than anchoring to source material; add a hard rule to the turn prompt: only assert facts present in the background context, never introduce details from what other characters said
+- [ ] Shadowtalk: NPC dialogue bleed — in-universe dialogue in source chunks (e.g. `TWO SPIRITS: ...`, `BRYANT: ...`) bleeds into LLM output and characters speak as the NPC; add a rule to the turn prompt: ignore and never reproduce any dialogue found in the background
+- [ ] Shadowtalk: topic drift — original topic is absent from `TURN_PROMPT`; characters lose the thread by turn 5-6 as each message builds on the previous one; add `topic: {topic}` to the turn prompt so the LLM can re-anchor
 - [ ] Claude Code session sync — sync `~/.claude/projects/` across machines to preserve conversation history

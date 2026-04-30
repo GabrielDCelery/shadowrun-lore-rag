@@ -7,13 +7,16 @@ consecutive repeats.
 
 Usage:
     uv run python src/shadowtalk.py "Tell me about Aztlan corporate security"
+    uv run python src/shadowtalk.py --debug "Tell me about Aztlan corporate security" > out.json
 """
 
+import json
 import random
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from langchain_chroma import Chroma
+from langchain_community.vectorstores.utils import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama, OllamaEmbeddings
@@ -29,8 +32,16 @@ class Persona:
     perspective: str
 
 
+_SHARED_RULES = """Output rules — these override everything else:
+- Plain text only — no ">", ">>", brackets, timestamps, or signatures
+- No narration, no "I say", no "my avatar" — write the message itself
+- No verbal acknowledgments — forbidden phrases include: "good point", "agreed", "NAME is right", "that's interesting", "I think NAME is onto something", "This X makes me think"
+"""
+
 OPEN_PROMPT = ChatPromptTemplate.from_template(
-    """You are {handle} in a private Shadowrun Matrix chat with other shadowrunners.
+    """You are {handle} ({description}) in a private Shadowrun Matrix chat with other shadowrunners.
+
+""" + _SHARED_RULES + """
 
 Background knowledge:
 {context}
@@ -42,7 +53,9 @@ Do not invent names or places not mentioned in the background."""
 )
 
 TURN_PROMPT = ChatPromptTemplate.from_template(
-    """You are {handle} in a private Shadowrun Matrix chat with other shadowrunners.
+    """You are {handle} ({description}) in a private Shadowrun Matrix chat with other shadowrunners.
+
+""" + _SHARED_RULES + """
 
 Background knowledge:
 {context}
@@ -57,51 +70,22 @@ Use what you know from the background above. Do not invent names or places not i
 PERSONAS = [
     Persona(
         handle="FastJack",
-        description=(
-            "legendary veteran decker and fixer, male. Been in the shadows long enough to stop "
-            "caring about what and start asking why. Deeply cynical — assumes everything is a "
-            "play and someone is benefiting. When everyone else is tracking the threat, he's "
-            "tracking the motive: who set this up, why now, who walks away clean. Speaks in "
-            "clipped fragments — never more than 10 words per sentence. Drops a fact only when "
-            "it points at something bigger. States conclusions, never speculates out loud."
-        ),
+        description="cuts to motive — who set it up, why now, who walks away clean",
         perspective="veteran decker and fixer perspective on",
     ),
     Persona(
         handle="Bull",
-        description=(
-            "troll ex-corporate security turned street samurai, male. Ran corporate security "
-            "long enough to know that the contract never says what the job actually is. Reads "
-            "ops by their structure: what kind of team they hired, who's running point, whether "
-            "it's official or deniable. That tells him more than anything in the briefing. "
-            "Blunt and specific — never trades in general cynicism when he can name the play. "
-            "Speaks from what he's run or seen run, not from what he thinks corps are like."
-        ),
+        description="reads the op structure — what the team composition tells you about the real objective",
         perspective="street samurai and corporate security perspective on",
     ),
     Persona(
         handle="Coyote",
-        description=(
-            "human street shaman, female, Coyote totem. Grew up in the Barrens, learned magic "
-            "the hard way. Treats spirits as dangerous tools — respects them, doesn't romanticise "
-            "them. Knows urban astral terrain: background counts, toxic zones, spirit territories, "
-            "what kills what. Speaks plainly and fast. No mysticism, no philosophy — just "
-            "what she's seen and what it costs."
-        ),
+        description="speaks from what she personally ran into — a spirit, a zone, something that cost her",
         perspective="street shaman and urban awakened perspective on",
     ),
     Persona(
         handle="Ledger",
-        description=(
-            "former mid-level Aztechnology financial analyst turned shadowrunner, female. "
-            "Left Aztec because she saw how it ends for people who know too much — and she "
-            "knows too much. Paranoid in a specific way: she recognises corp plays the way "
-            "you recognise a con you've been run before. Watches for when corps go quiet, "
-            "when assets move, when executives disappear from public agendas. Speaks in short "
-            "tight bursts — not because she's efficient but because she's always listening for "
-            "the door. Never invents a number. Expresses risk as behaviour: which corp moves, "
-            "which exec goes silent, who starts restructuring."
-        ),
+        description="watches for when corps go quiet, when assets move, who takes the fall",
         perspective="corporate financial analyst and insider perspective on",
     ),
 ]
@@ -111,14 +95,15 @@ TURNS = 8  # 2 full rounds for 4 personas
 
 def retrieve(
     vector_store: Chroma, query: str, exclude_ids: set[str], handle: str
-) -> tuple[str, set[str]]:
+) -> tuple[str, set[str], list[Document]]:
     search_kwargs: dict = {"k": settings.top_k}
     if exclude_ids:
         search_kwargs["filter"] = {"chunk_id": {"$nin": list(exclude_ids)}}
     search_kwargs["where_document"] = {"$not_contains": handle}
     docs = vector_store.similarity_search(query, **search_kwargs)
     new_ids = {doc.metadata["chunk_id"] for doc in docs if "chunk_id" in doc.metadata}
-    return "\n\n".join(doc.page_content for doc in docs), new_ids
+    context = "\n\n".join(doc.page_content for doc in docs)
+    return context, new_ids, docs
 
 
 def generate(llm: ChatOllama, prompt: ChatPromptTemplate, **kwargs) -> str:
@@ -147,7 +132,7 @@ def make_schedule(turns: int) -> list[Persona]:
     return schedule[:turns]
 
 
-def run(topic: str) -> None:
+def run(topic: str, debug: bool = False) -> None:
     if not settings.chroma_path.exists():
         logger.error(f"vector store not found at {settings.chroma_path}")
         sys.exit(1)
@@ -166,23 +151,25 @@ def run(topic: str) -> None:
         embedding_function=embeddings,
     )
     history_lines: list[str] = []
-    used_ids: dict[str, set[str]] = {p.handle: set() for p in PERSONAS}
+    used_ids: set[str] = set()
     schedule = make_schedule(TURNS)
+    debug_turns: list[dict] = []
 
     for turn, persona in enumerate(schedule):
         is_last = turn == TURNS - 1
 
         query = f"{topic} {persona.perspective}"
-        context, new_ids = retrieve(
-            vector_store, query, used_ids[persona.handle], persona.handle
+        context, new_ids, docs = retrieve(
+            vector_store, query, used_ids, persona.handle
         )
-        used_ids[persona.handle].update(new_ids)
+        used_ids.update(new_ids)
 
         if turn == 0:
             text = generate(
                 llm,
                 OPEN_PROMPT,
                 handle=persona.handle,
+                description=persona.description,
                 context=context,
                 topic=topic,
             )
@@ -199,28 +186,53 @@ def run(topic: str) -> None:
                 llm,
                 TURN_PROMPT,
                 handle=persona.handle,
+                description=persona.description,
                 context=context,
                 reply_to=reply_to,
                 cutoff=cutoff,
             )
 
         history_lines.append(f"[{persona.handle}]: {text}")
-        print(format_line(persona.handle, text))
-        print()
 
-    print(">>> [SIGNAL LOST] <<<")
+        if debug:
+            debug_turns.append({
+                "turn": turn,
+                "handle": persona.handle,
+                "query": query,
+                "chunks": [
+                    {
+                        "chunk_id": doc.metadata.get("chunk_id", ""),
+                        "source": doc.metadata.get("source", ""),
+                        "content": doc.page_content,
+                    }
+                    for doc in docs
+                ],
+                "text": text,
+            })
+        else:
+            print(format_line(persona.handle, text))
+            print()
+
+    if debug:
+        print(json.dumps({"topic": topic, "turns": debug_turns}, indent=2))
+    else:
+        print(">>> [SIGNAL LOST] <<<")
 
 
 def main() -> None:
     setup_logging(settings.log_level)
 
-    if len(sys.argv) < 2:
-        print("Usage: python shadowtalk.py <topic>")
+    args = sys.argv[1:]
+    debug = "--debug" in args
+    args = [a for a in args if a != "--debug"]
+
+    if not args:
+        print("Usage: python shadowtalk.py [--debug] <topic>")
         print('Example: python shadowtalk.py "Tell me about Aztlan corporate security"')
         sys.exit(1)
 
-    topic = " ".join(sys.argv[1:])
-    run(topic)
+    topic = " ".join(args)
+    run(topic, debug=debug)
 
 
 if __name__ == "__main__":
